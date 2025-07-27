@@ -24,7 +24,7 @@ from compliance_guardian.agents import (
     primary_agent,
     rule_selector,
 )
-from compliance_guardian.utils import log_writer
+from compliance_guardian.utils import log_writer, user_study
 from compliance_guardian.utils.models import AuditLogEntry, PlanSummary
 
 
@@ -68,6 +68,7 @@ class PipelineResult(BaseModel):
     output_allowed: bool
     output_violations: List[AuditLogEntry]
     report_file: Optional[str]
+    final_action: str
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +103,12 @@ def _run_pipeline(prompt: str) -> PipelineResult:
         output_allowed = False
         output_entries = []
 
+    final_action = "allow"
+    if not output_allowed or not plan_allowed:
+        final_action = "block"
+    elif any(e.action == "WARN" for e in output_entries):
+        final_action = "warn"
+
     all_entries: List[AuditLogEntry] = []
     if plan_entry:
         all_entries.append(plan_entry)
@@ -126,6 +133,7 @@ def _run_pipeline(prompt: str) -> PipelineResult:
         output_allowed=output_allowed,
         output_violations=output_entries,
         report_file=report_name,
+        final_action=final_action,
     )
 
 
@@ -149,6 +157,12 @@ def _render_result_html(result: PipelineResult) -> str:
         if result.report_file
         else "No report generated"
     )
+    explanation = ""
+    if result.plan_violation:
+        explanation += result.plan_violation.justification or ""
+    if result.output_violations:
+        explanation += " " + " ".join(e.justification or "" for e in result.output_violations)
+    explanation = explanation.strip()
     html = f"""
     <html>
       <head><title>Compliance Result</title></head>
@@ -169,6 +183,16 @@ def _render_result_html(result: PipelineResult) -> str:
         {output_entries or '<p>No post-output violations.</p>'}
         <h2>Governance Report</h2>
         <p>{report_link}</p>
+        <h2>User Feedback</h2>
+        <form action='/feedback' method='post'>
+          <input type='hidden' name='scenario_id' value='{result.report_file or "web"}'>
+          <input type='hidden' name='prompt' value='{result.prompt}'>
+          <input type='hidden' name='action' value='{result.final_action}'>
+          <input type='hidden' name='explanation' value='{explanation}'>
+          <label>Rating (1-5): <input type='number' name='rating' min='1' max='5'></label><br>
+          <label>Comment: <input type='text' name='comment'></label><br>
+          <input type='submit' value='Submit Feedback'>
+        </form>
         <p><a href='/'>Submit another prompt</a></p>
       </body>
     </html>
@@ -211,6 +235,34 @@ async def api_submit(req: PromptRequest) -> PipelineResult:
     """JSON API endpoint mirroring :func:`submit`."""
 
     return _run_pipeline(req.prompt)
+
+
+@app.post("/feedback", response_class=HTMLResponse)
+async def feedback(
+    scenario_id: str = Form(...),
+    prompt: str = Form(...),
+    action: str = Form(...),
+    explanation: str = Form(""),
+    rating: int = Form(...),
+    comment: str = Form(""),
+) -> HTMLResponse:
+    """Collect user feedback from the result page."""
+
+    try:
+        user_study.record_user_feedback(
+            scenario_id=scenario_id,
+            prompt=prompt,
+            action_taken=action,
+            explanation_shown=explanation,
+            rating=rating,
+            user_comment=comment,
+        )
+        message = "Thank you for your feedback!"
+    except Exception as exc:  # pragma: no cover - invalid input
+        LOGGER.exception("Feedback recording failed: %s", exc)
+        message = "Failed to record feedback"
+
+    return HTMLResponse(f"<html><body><p>{message}</p><a href='/'>Back</a></body></html>")
 
 
 @app.get("/logs", response_class=HTMLResponse)
