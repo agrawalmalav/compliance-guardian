@@ -53,7 +53,6 @@ class TestLogWriter:
         content = (report_dir / "report.md").read_text()
         assert "ISO/EU" in content
 
-
     def test_rotate_logs(self, paths, monkeypatch):
         log_dir, _ = paths
         log_file = log_dir / "audit_log.jsonl"
@@ -63,4 +62,3 @@ class TestLogWriter:
         log_writer._rotate_logs()
         rotated = list(log_dir.glob("audit_log_*.jsonl"))
         assert rotated and rotated[0].exists()
-

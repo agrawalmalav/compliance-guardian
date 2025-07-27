@@ -27,6 +27,7 @@ _LOG_SIZE_LIMIT = 5 * 1024 * 1024  # 5 MB
 
 # ---------------------------------------------------------------------------
 
+
 def _rotate_logs() -> None:
     """Rotate the main audit log when it exceeds the configured size."""
     try:
@@ -43,7 +44,10 @@ def _rotate_logs() -> None:
 
 # ---------------------------------------------------------------------------
 
-def log_decision(log_entry: AuditLogEntry, session: Optional[SessionContext] = None) -> None:
+
+def log_decision(
+    log_entry: AuditLogEntry, session: Optional[SessionContext] = None
+) -> None:
     """Append ``log_entry`` to ``audit_log.jsonl`` with run metadata.
 
     The function writes a single JSON object per line allowing efficient
@@ -77,6 +81,7 @@ def log_decision(log_entry: AuditLogEntry, session: Optional[SessionContext] = N
 
 
 # ---------------------------------------------------------------------------
+
 
 def log_session_report(entries: List[AuditLogEntry], file_path: str) -> None:
     """Generate a Markdown governance report from ``entries``.
@@ -112,7 +117,10 @@ def log_session_report(entries: List[AuditLogEntry], file_path: str) -> None:
 
         yaml_block = json.dumps({"run_hash": _RUN_HASH, "entries": summary}, indent=2)
 
-        table_lines = ["| rule_id | clause | action | risk_score |", "| --- | --- | --- | --- |"]
+        table_lines = [
+            "| rule_id | clause | action | risk_score |",
+            "| --- | --- | --- | --- |",
+        ]
         for s in summary:
             table_lines.append(
                 f"| {s['rule_id']} | {s['clause'] or ''} | {s['action']} | {s['risk_score'] or ''} |"
@@ -127,4 +135,3 @@ def log_session_report(entries: List[AuditLogEntry], file_path: str) -> None:
         LOGGER.info("Wrote session report to %s", path)
     except Exception as exc:  # pragma: no cover - filesystem errors
         LOGGER.exception("Failed to write session report: %s", exc)
-

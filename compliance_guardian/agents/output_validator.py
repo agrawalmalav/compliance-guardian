@@ -31,6 +31,7 @@ logging.basicConfig(level=logging.INFO)
 
 # ---------------------------------------------------------------------------
 
+
 def _call_llm(prompt: str) -> str:
     """Invoke the configured LLM and return its textual response."""
 
@@ -51,6 +52,7 @@ def _call_llm(prompt: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+
 
 def _check_rule(text: str, rule: Rule) -> AuditLogEntry | None:
     """Check ``text`` against ``rule`` and return an audit entry if needed."""
@@ -103,6 +105,7 @@ def _check_rule(text: str, rule: Rule) -> AuditLogEntry | None:
 
 # ---------------------------------------------------------------------------
 
+
 def _severity_action(sev: SeverityLevel) -> str:
     """Return action label for a given ``SeverityLevel``."""
 
@@ -114,6 +117,7 @@ def _severity_action(sev: SeverityLevel) -> str:
 
 
 # ---------------------------------------------------------------------------
+
 
 def validate_output(output: str, rules: List[Rule]) -> Tuple[bool, List[AuditLogEntry]]:
     """Validate ``output`` against a list of ``rules``.
@@ -178,4 +182,3 @@ if __name__ == "__main__":  # pragma: no cover - manual tests
     print("Allowed2:", allowed2)
     for log in logs2:
         print(log.model_dump_json(indent=2))
-

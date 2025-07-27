@@ -38,6 +38,7 @@ _KEYWORDS: Dict[str, Iterable[str]] = {
 
 # ---------------------------------------------------------------------------
 
+
 def _llm_classify(prompt: str) -> str:
     """Classify ``prompt`` with an LLM as a last resort."""
     system = (
@@ -74,6 +75,7 @@ def _llm_classify(prompt: str) -> str:
 
 # ---------------------------------------------------------------------------
 
+
 def classify_domain(prompt: str) -> str:
     """Return the high-level domain for a user ``prompt``.
 
@@ -84,7 +86,9 @@ def classify_domain(prompt: str) -> str:
     """
 
     lowered = prompt.lower()
-    hits = {name for name, words in _KEYWORDS.items() if any(w in lowered for w in words)}
+    hits = {
+        name for name, words in _KEYWORDS.items() if any(w in lowered for w in words)
+    }
 
     if len(hits) == 1:
         domain = hits.pop()
@@ -102,6 +106,7 @@ def classify_domain(prompt: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+
 
 def _run_tests() -> None:
     """Simple unit tests exercised when run as a script."""

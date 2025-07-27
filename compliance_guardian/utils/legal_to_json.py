@@ -46,6 +46,7 @@ def _call_llm(prompt: str) -> str:
 
 # ---------------------------------------------------------------------------
 
+
 def convert_clause_to_rule(text: str) -> Rule:
     """Convert a legal or policy ``text`` clause to a :class:`Rule`.
 
@@ -88,7 +89,9 @@ def convert_clause_to_rule(text: str) -> Rule:
 
     rule = Rule.from_dict(data)
     domain = rule.domain if isinstance(rule.domain, str) else rule.domain.value
-    rules_path = Path(__file__).resolve().parents[1] / "config" / "rules" / f"{domain}.json"
+    rules_path = (
+        Path(__file__).resolve().parents[1] / "config" / "rules" / f"{domain}.json"
+    )
     rules_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -132,4 +135,3 @@ if __name__ == "__main__":  # pragma: no cover - manual demo
     )
     new_rule = convert_clause_to_rule(sample_clause)
     print("Created rule:\n", new_rule.model_dump_json(indent=2))
-

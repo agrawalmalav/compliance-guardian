@@ -16,14 +16,17 @@ class TestDomainClassifier:
         assert domain_classifier.classify_domain("patient diagnosis") == "medical"
 
     def test_llm_fallback(self):
-        with patch.object(domain_classifier, "_llm_classify", return_value="other") as mocked:
+        with patch.object(
+            domain_classifier, "_llm_classify", return_value="other"
+        ) as mocked:
             result = domain_classifier.classify_domain("ambiguous text")
             mocked.assert_called()
             assert result == "other"
 
     def test_ambiguous_keywords_calls_llm(self):
-        with patch.object(domain_classifier, "_llm_classify", return_value="finance") as mocked:
+        with patch.object(
+            domain_classifier, "_llm_classify", return_value="finance"
+        ) as mocked:
             result = domain_classifier.classify_domain("scrape and trade")
             assert result == "finance"
             mocked.assert_called_once()
-

@@ -38,11 +38,18 @@ class TestModels:
         assert data["rule_id"] == "R1"
 
     def test_session_context_roundtrip(self):
-        ctx = models.SessionContext(session_id="S", domain="other", user_id="U", risk_threshold=1.0)
+        ctx = models.SessionContext(
+            session_id="S", domain="other", user_id="U", risk_threshold=1.0
+        )
         recovered = models.SessionContext.from_dict(ctx.to_dict())
         assert recovered.session_id == "S"
 
     def test_plan_summary_fallbacks(self):
-        plan = models.PlanSummary(action_plan="do", goal="g", domain="other", sub_actions=["x"], original_prompt="p")
+        plan = models.PlanSummary(
+            action_plan="do",
+            goal="g",
+            domain="other",
+            sub_actions=["x"],
+            original_prompt="p",
+        )
         assert "do" in plan.to_dict()["action_plan"]
-
