@@ -37,4 +37,3 @@ class TestEvaluation:
         with patch("rich.progress.track", lambda x, description: x):
             p, r, f = eval_module.evaluate()
         assert p == r == f == 1.0
-

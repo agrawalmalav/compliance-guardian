@@ -47,6 +47,7 @@ logging.basicConfig(level=logging.INFO)
 
 # ---------------------------------------------------------------------------
 
+
 def _coerce_domain(domain: str) -> ComplianceDomain:
     """Convert ``domain`` string to :class:`ComplianceDomain` if possible."""
     try:
@@ -56,6 +57,7 @@ def _coerce_domain(domain: str) -> ComplianceDomain:
 
 
 # ---------------------------------------------------------------------------
+
 
 def _call_llm(messages: List[dict]) -> str:
     """Internal helper to call either OpenAI or Gemini models."""
@@ -71,6 +73,7 @@ def _call_llm(messages: List[dict]) -> str:
 
 
 # ---------------------------------------------------------------------------
+
 
 def generate_plan(prompt: str, domain: str) -> PlanSummary:
     """Generate an execution plan from ``prompt`` for a given ``domain``.
@@ -122,6 +125,7 @@ def generate_plan(prompt: str, domain: str) -> PlanSummary:
 
 # ---------------------------------------------------------------------------
 
+
 def execute_task(plan: PlanSummary, rules: List[Rule], approved: bool) -> str:
     """Execute ``plan`` under ``rules`` if ``approved``.
 
@@ -143,13 +147,14 @@ def execute_task(plan: PlanSummary, rules: List[Rule], approved: bool) -> str:
         LOGGER.warning("Execution aborted: plan not approved")
         return "Execution aborted: plan not approved"
 
-    rule_lines = [
-        f"({r.rule_id}) {r.llm_instruction or r.description}" for r in rules
-    ]
+    rule_lines = [f"({r.rule_id}) {r.llm_instruction or r.description}" for r in rules]
     system_rules = "You must comply with the following rules:\n" + "\n".join(rule_lines)
 
-    user_steps = "Goal: " + plan.goal + "\n" + "\n".join(
-        f"{i+1}. {s}" for i, s in enumerate(plan.sub_actions)
+    user_steps = (
+        "Goal: "
+        + plan.goal
+        + "\n"
+        + "\n".join(f"{i+1}. {s}" for i, s in enumerate(plan.sub_actions))
     )
     messages = [
         {"role": "system", "content": system_rules},
@@ -168,6 +173,7 @@ def execute_task(plan: PlanSummary, rules: List[Rule], approved: bool) -> str:
 
 
 # ---------------------------------------------------------------------------
+
 
 def _demo() -> None:
     """Demonstrate planning and execution for various domains."""

@@ -51,4 +51,3 @@ class TestOutputValidator:
     def test_validate_output_no_issues(self, regex_rule):
         ok, entries = output_validator.validate_output("clean", [regex_rule])
         assert ok and not entries
-

@@ -37,6 +37,7 @@ logging.basicConfig(level=logging.INFO)
 
 # ---------------------------------------------------------------------------
 
+
 def _call_llm(prompt: str) -> str:
     """Invoke the configured LLM with ``prompt`` and return the response."""
 
@@ -58,6 +59,7 @@ def _call_llm(prompt: str) -> str:
 
 # ---------------------------------------------------------------------------
 
+
 def _action_for_severity(sev: SeverityLevel) -> str:
     """Map ``SeverityLevel`` to an action label used in logs."""
 
@@ -70,6 +72,7 @@ def _action_for_severity(sev: SeverityLevel) -> str:
 
 # ---------------------------------------------------------------------------
 
+
 def _build_audit_entry(
     rule: Rule,
     text: str,
@@ -79,7 +82,11 @@ def _build_audit_entry(
     """Create an :class:`AuditLogEntry` for a rule violation."""
 
     action = _action_for_severity(rule.severity)
-    suggested = "Review the content for compliance." if rule.severity != SeverityLevel.LOW else None
+    suggested = (
+        "Review the content for compliance."
+        if rule.severity != SeverityLevel.LOW
+        else None
+    )
     return AuditLogEntry(
         rule_id=rule.rule_id,
         severity=rule.severity,
@@ -97,6 +104,7 @@ def _build_audit_entry(
 
 
 # ---------------------------------------------------------------------------
+
 
 def _check_text_against_rule(text: str, rule: Rule) -> Optional[AuditLogEntry]:
     """Check ``text`` against a single compliance ``rule``.
@@ -143,7 +151,10 @@ def _check_text_against_rule(text: str, rule: Rule) -> Optional[AuditLogEntry]:
 
 # ---------------------------------------------------------------------------
 
-def check_plan(plan: PlanSummary, rules: List[Rule]) -> Tuple[bool, Optional[AuditLogEntry]]:
+
+def check_plan(
+    plan: PlanSummary, rules: List[Rule]
+) -> Tuple[bool, Optional[AuditLogEntry]]:
     """Validate a :class:`PlanSummary` against compliance ``rules``.
 
     Iterates over each rule and returns as soon as a violation is
@@ -167,9 +178,7 @@ def check_plan(plan: PlanSummary, rules: List[Rule]) -> Tuple[bool, Optional[Aud
         entry = _check_text_against_rule(plan.action_plan, rule)
         if entry:
             allowed = entry.action != "BLOCK"
-            LOGGER.debug(
-                "Rule %s triggered with action %s", rule.rule_id, entry.action
-            )
+            LOGGER.debug("Rule %s triggered with action %s", rule.rule_id, entry.action)
             return allowed, entry
     LOGGER.info("Plan passed all compliance checks")
     return True, None
@@ -177,7 +186,10 @@ def check_plan(plan: PlanSummary, rules: List[Rule]) -> Tuple[bool, Optional[Aud
 
 # ---------------------------------------------------------------------------
 
-def post_output_check(output: str, rules: List[Rule]) -> Tuple[bool, List[AuditLogEntry]]:
+
+def post_output_check(
+    output: str, rules: List[Rule]
+) -> Tuple[bool, List[AuditLogEntry]]:
     """Validate final ``output`` text against ``rules``.
 
     Unlike :func:`check_plan` this function aggregates all rule
@@ -250,4 +262,3 @@ if __name__ == "__main__":  # pragma: no cover - manual demonstration
     print("Post check allowed:", ok2)
     for e in entries2:
         print(e.model_dump_json(indent=2))
-

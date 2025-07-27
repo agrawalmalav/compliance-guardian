@@ -20,6 +20,7 @@ DEFAULT_SCORES = {
 
 # ---------------------------------------------------------------------------
 
+
 def score_risk(
     rule: Rule,
     plan: PlanSummary,
@@ -42,7 +43,11 @@ def score_risk(
         Risk score between 0 and 100 where higher indicates more risk.
     """
 
-    domain = plan.domain.value if isinstance(plan.domain, ComplianceDomain) else str(plan.domain)
+    domain = (
+        plan.domain.value
+        if isinstance(plan.domain, ComplianceDomain)
+        else str(plan.domain)
+    )
     if matrix and domain in matrix and rule.rule_id in matrix[domain]:
         score = matrix[domain][rule.rule_id]
         LOGGER.info(
@@ -59,4 +64,3 @@ def score_risk(
         domain,
     )
     return score
-

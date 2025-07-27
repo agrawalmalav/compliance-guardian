@@ -64,4 +64,3 @@ class TestRuleSelector:
         sel = rule_selector.RuleSelector(rules_dir=tmp_rules)
         with pytest.raises(rule_selector.RuleLoadError):
             sel.load("missing")
-
