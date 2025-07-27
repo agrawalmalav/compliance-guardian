@@ -1,4 +1,11 @@
-"""Utility functions for writing compliance logs and reports."""
+"""Utility functions for writing compliance logs and reports.
+
+The functions here write structured :class:`AuditLogEntry` objects to the
+``logs/audit_log.jsonl`` file. Multilingual explanations can be recorded by
+first calling :func:`compliance_guardian.utils.i18n.translate_explanation` and
+then :func:`compliance_guardian.utils.i18n.log_multilingual_explanation` to
+append the translated text to the audit log.
+"""
 
 from __future__ import annotations
 
@@ -62,6 +69,14 @@ def log_decision(
         Structured audit log entry describing an event.
     session:
         Optional session context to embed alongside the entry.
+    
+    Notes
+    -----
+    To produce multilingual logs call
+    :func:`compliance_guardian.utils.i18n.translate_explanation` with
+    ``log_entry.justification`` and then
+    :func:`compliance_guardian.utils.i18n.log_multilingual_explanation` to store
+    the translated text alongside the base entry.
     """
 
     try:
