@@ -40,7 +40,7 @@ class TestComplianceAgent:
             sub_actions=["bar"],
             original_prompt="p",
         )
-        allowed, entry = compliance_agent.check_plan(plan, [regex_rule])
+        allowed, entry = compliance_agent.check_plan(plan, [regex_rule], "v1")
         assert allowed and entry is None
 
     def test_check_plan_regex_block(self, regex_rule):
@@ -51,7 +51,7 @@ class TestComplianceAgent:
             sub_actions=["foo"],
             original_prompt="p",
         )
-        allowed, entry = compliance_agent.check_plan(plan, [regex_rule])
+        allowed, entry = compliance_agent.check_plan(plan, [regex_rule], "v1")
         assert not allowed
         assert entry and entry.action == "BLOCK"
 
@@ -64,7 +64,7 @@ class TestComplianceAgent:
             original_prompt="p",
         )
         with patch.object(compliance_agent, "_call_llm", return_value="Yes violation"):
-            allowed, entry = compliance_agent.check_plan(plan, [semantic_rule])
+            allowed, entry = compliance_agent.check_plan(plan, [semantic_rule], "v1")
             assert not allowed
             assert entry and "violation" in entry.justification.lower()
 
@@ -79,11 +79,11 @@ class TestComplianceAgent:
         with patch.object(
             compliance_agent, "_call_llm", side_effect=RuntimeError("boom")
         ):
-            allowed, entry = compliance_agent.check_plan(plan, [semantic_rule])
+            allowed, entry = compliance_agent.check_plan(plan, [semantic_rule], "v1")
             assert not allowed
             assert entry and "failed" in entry.justification
 
     def test_post_output_check(self, regex_rule):
-        allowed, entries = compliance_agent.post_output_check("foo bar", [regex_rule])
+        allowed, entries = compliance_agent.post_output_check("foo bar", [regex_rule], "v1")
         assert not allowed
         assert entries and entries[0].rule_id == "R"

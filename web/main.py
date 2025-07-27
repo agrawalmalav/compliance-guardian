@@ -85,18 +85,19 @@ def _run_pipeline(prompt: str) -> PipelineResult:
 
     try:
         rules = _SELECTOR.load(domain)
+        rulebase_ver = _SELECTOR.get_version(domain)
     except Exception as exc:
         LOGGER.exception("Rule loading failed: %s", exc)
         raise HTTPException(status_code=500, detail="Could not load compliance rules")
 
     plan = primary_agent.generate_plan(prompt, domain)
 
-    plan_allowed, plan_entry = compliance_agent.check_plan(plan, rules)
+    plan_allowed, plan_entry = compliance_agent.check_plan(plan, rules, rulebase_ver)
 
     if plan_allowed:
         execution_output = primary_agent.execute_task(plan, rules, approved=True)
         output_allowed, output_entries = compliance_agent.post_output_check(
-            execution_output, rules
+            execution_output, rules, rulebase_ver
         )
     else:
         execution_output = "Execution blocked: plan violates compliance rules"

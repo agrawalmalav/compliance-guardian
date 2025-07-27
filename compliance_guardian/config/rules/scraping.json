@@ -1,8 +1,9 @@
 # Scraping domain: compliance with privacy and copyright laws. A "BLOCK" action
 # stops scraping activity and prevents using or storing scraped data.
-[
+{"version": "1.0.0", "rules": [
   {
     "rule_id": "SCR001",
+    "version": "1.0.0",
     "description": "Block collection of email addresses or phone numbers without user consent.",
     "type": "regex",
     "severity": "high",
@@ -15,6 +16,7 @@
   },
   {
     "rule_id": "SCR002",
+    "version": "1.0.0",
     "description": "Respect robots.txt and meta tags prohibiting scraping.",
     "type": "semantic",
     "severity": "medium",
@@ -27,6 +29,7 @@
   },
   {
     "rule_id": "SCR003",
+    "version": "1.0.0",
     "description": "Ensure explicit consent before scraping social media profiles.",
     "type": "llm",
     "severity": "high",
@@ -39,6 +42,7 @@
   },
   {
     "rule_id": "SCR004",
+    "version": "1.0.0",
     "description": "Avoid scraping text marked with copyright notices or 'all rights reserved'.",
     "type": "regex",
     "severity": "high",
@@ -51,6 +55,7 @@
   },
   {
     "rule_id": "SCR005",
+    "version": "1.0.0",
     "description": "Do not circumvent paywalls or authentication mechanisms while scraping.",
     "type": "semantic",
     "severity": "high",
@@ -61,4 +66,4 @@
     "legal_reference": "https://www.law.cornell.edu/uscode/text/18/1030",
     "example_violation": "Using scripts to access premium articles without paying"
   }
-]
+]}

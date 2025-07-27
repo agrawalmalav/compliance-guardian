@@ -10,6 +10,7 @@ JSON object containing the overall ``goal`` and a list of ``steps``.
 If the LLM cannot be reached the function falls back to a simple,
 heuristic plan.
 
+
 ``execute_task`` -- Executes an approved plan under a set of compliance
 ``Rule`` objects. The rules are injected into the system prompt so the
 LLM understands the operational constraints. If ``approved`` is ``False``
@@ -17,6 +18,8 @@ the function logs the event and aborts gracefully.
 """
 
 from __future__ import annotations
+__version__ = "0.2.1"
+
 
 import json
 import logging

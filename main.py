@@ -107,7 +107,9 @@ def run_pipeline(
             justification=f"classified as {domain}",
             session_id=session_id,
             agent_stack=["domain_classifier"],
-            rulebase_version="v1",
+            rule_version=None,
+            agent_versions={"domain_classifier": domain_classifier.__version__},
+            rulebase_version=None,
             execution_time=duration,
         )
     )
@@ -115,6 +117,7 @@ def run_pipeline(
     # --- Rule loading ---
     selector = rule_selector.RuleSelector()
     rules = selector.load(domain)
+    rulebase_ver = selector.get_version(domain)
     LOGGER.info("Loaded %d rules for domain %s", len(rules), domain)
 
     # --- Plan generation ---
@@ -131,13 +134,15 @@ def run_pipeline(
             justification="plan generated",
             session_id=session_id,
             agent_stack=["primary_agent"],
-            rulebase_version="v1",
+            rule_version=None,
+            agent_versions={"primary_agent": primary_agent.__version__},
+            rulebase_version=rulebase_ver,
             execution_time=duration,
         )
     )
 
     # --- Pre-execution compliance check ---
-    allowed, violation = compliance_agent.check_plan(plan, rules)
+    allowed, violation = compliance_agent.check_plan(plan, rules, rulebase_ver)
     if violation:
         log_decision(violation)
         entries.append(violation)
@@ -175,6 +180,7 @@ def run_pipeline(
     allowed_out, out_entries = compliance_agent.post_output_check(
         output,
         rules,
+        rulebase_ver,
     )
     for entry in out_entries:
         log_decision(entry)
