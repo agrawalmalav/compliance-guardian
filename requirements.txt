@@ -1,0 +1,16 @@
+langchain
+langgraph
+openai
+google-generativeai
+pyyaml
+watchdog
+pydantic
+tqdm
+rich
+pytest
+sphinx
+mypy
+flake8
+black
+typer
+
