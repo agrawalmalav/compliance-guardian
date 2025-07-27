@@ -114,3 +114,5 @@ cython_debug/
 # VS Code settings
 .vscode/
 
+.idea/
+.DS_Store
