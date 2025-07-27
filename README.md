@@ -42,6 +42,24 @@ python main.py run --prompt "Scrape article titles from example.com" --session-i
 
 Audit logs appear under `logs/` and a governance report under `reports/`.
 
+## Multilingual Support
+
+Translated explanations help international stakeholders review audit reports.
+Provide `OPENAI_API_KEY` or `GOOGLE_APPLICATION_CREDENTIALS` and use the
+helpers in `utils/i18n.py`:
+
+```python
+from compliance_guardian.utils.i18n import (
+    translate_explanation,
+    log_multilingual_explanation,
+)
+
+fr_text = translate_explanation(entry.justification, "fr")
+log_multilingual_explanation(entry, fr_text, target_lang="fr", translation_source="openai")
+```
+
+The translated text and the provider used are appended to `logs/audit_log.jsonl`.
+
 ## Running Tests and Demo
 
 Run static checks and the demo scenarios:
