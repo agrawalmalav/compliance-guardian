@@ -1,0 +1,64 @@
+# Medical domain: reflects HIPAA and medical ethics. A "BLOCK" action
+# halts disclosure or generation of sensitive health information.
+[
+  {
+    "rule_id": "MED001",
+    "description": "Mask patient identifiers such as patient IDs or SSNs.",
+    "type": "regex",
+    "severity": "high",
+    "pattern": "(?i)(patient\\s*id[:=]\\s*\\d+|\\b\\d{3}-\\d{2}-\\d{4}\\b)",
+    "keywords": [],
+    "llm_instruction": null,
+    "clause_mapping": {"HIPAA": "45 CFR §164.502"},
+    "legal_reference": "https://www.hhs.gov/hipaa/for-professionals/privacy/index.html",
+    "example_violation": "Patient ID=12345 admitted yesterday"
+  },
+  {
+    "rule_id": "MED002",
+    "description": "Flag unsubstantiated miracle cure claims.",
+    "type": "semantic",
+    "severity": "medium",
+    "pattern": null,
+    "keywords": ["miracle cure", "100% effective", "guaranteed healing"],
+    "llm_instruction": null,
+    "clause_mapping": {"FDA": "21 CFR §202"},
+    "legal_reference": "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-202",
+    "example_violation": "This herbal pill is a 100% effective cancer cure"
+  },
+  {
+    "rule_id": "MED003",
+    "description": "Require informed consent before using patient data for research.",
+    "type": "llm",
+    "severity": "high",
+    "pattern": null,
+    "keywords": [],
+    "llm_instruction": "Check for documented patient consent before research use; without it issue a BLOCK.",
+    "clause_mapping": {"Declaration of Helsinki": "Paragraph 25"},
+    "legal_reference": "https://www.wma.net/what-we-do/medical-ethics/declaration-of-helsinki/",
+    "example_violation": "Publishing case study without consent"
+  },
+  {
+    "rule_id": "MED004",
+    "description": "Detect biased or discriminatory language in clinical notes.",
+    "type": "llm",
+    "severity": "high",
+    "pattern": null,
+    "keywords": [],
+    "llm_instruction": "Flag and BLOCK notes that stereotype patients based on race, gender, or disability.",
+    "clause_mapping": {"AMA Ethics": "Opinion 1.1"},
+    "legal_reference": "https://code-medical-ethics.ama-assn.org/ethics-opinions",
+    "example_violation": "The patient is non-compliant because of her ethnicity"
+  },
+  {
+    "rule_id": "MED005",
+    "description": "Avoid copying entire copyrighted medical articles.",
+    "type": "regex",
+    "severity": "high",
+    "pattern": "(?i)(©|\\ball rights reserved\\b)\\s.*medical",
+    "keywords": [],
+    "llm_instruction": null,
+    "clause_mapping": {"Copyright": "17 U.S.C."},
+    "legal_reference": "https://www.copyright.gov/title17/",
+    "example_violation": "© 2024 Medical Journal of Examples all rights reserved"
+  }
+]

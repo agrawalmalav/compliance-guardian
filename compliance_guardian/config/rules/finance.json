@@ -1,0 +1,64 @@
+# Finance domain: aligned with financial regulations. A "BLOCK" action
+# prevents execution of the financial transaction or disclosure.
+[
+  {
+    "rule_id": "FIN001",
+    "description": "Do not expose full account or credit card numbers.",
+    "type": "regex",
+    "severity": "high",
+    "pattern": "\\b\\d{4}[- ]?\\d{4}[- ]?\\d{4}[- ]?\\d{4}\\b",
+    "keywords": [],
+    "llm_instruction": null,
+    "clause_mapping": {"PCI DSS": "Req. 3"},
+    "legal_reference": "https://www.pcisecuritystandards.org/",
+    "example_violation": "Customer card 1234-5678-9012-3456"
+  },
+  {
+    "rule_id": "FIN002",
+    "description": "Avoid misleading guarantees of investment returns.",
+    "type": "semantic",
+    "severity": "medium",
+    "pattern": null,
+    "keywords": ["guaranteed", "risk-free", "no loss"],
+    "llm_instruction": null,
+    "clause_mapping": {"SEC": "Rule 10b-5"},
+    "legal_reference": "https://www.sec.gov/rules/final/33-7825.htm",
+    "example_violation": "Our fund offers guaranteed 20% returns"
+  },
+  {
+    "rule_id": "FIN003",
+    "description": "Require customer consent before sharing financial data with third parties.",
+    "type": "llm",
+    "severity": "high",
+    "pattern": null,
+    "keywords": [],
+    "llm_instruction": "Verify documented consent before any data sharing; otherwise BLOCK the request.",
+    "clause_mapping": {"GDPR Art. 6": "Lawfulness of processing"},
+    "legal_reference": "https://gdpr-info.eu/art-6-gdpr/",
+    "example_violation": "Sending transaction history to marketing partner"
+  },
+  {
+    "rule_id": "FIN004",
+    "description": "Detect text suggesting discriminatory lending or denial based on protected attributes.",
+    "type": "semantic",
+    "severity": "high",
+    "pattern": null,
+    "keywords": ["redline", "minority", "race", "gender"],
+    "llm_instruction": null,
+    "clause_mapping": {"Equal Credit Opportunity": "15 U.S.C. §1691"},
+    "legal_reference": "https://www.consumerfinance.gov/rules-policy/regulations/1002/",
+    "example_violation": "We avoid loans in minority neighborhoods"
+  },
+  {
+    "rule_id": "FIN005",
+    "description": "Prevent insider trading tips or non-public information disclosures.",
+    "type": "llm",
+    "severity": "high",
+    "pattern": null,
+    "keywords": [],
+    "llm_instruction": "If text contains non-public financial details intended for trading advantage, BLOCK and log.",
+    "clause_mapping": {"US Securities": "15 U.S.C. §78j"},
+    "legal_reference": "https://www.law.cornell.edu/uscode/text/15/78j",
+    "example_violation": "Buy shares before earnings announcement tomorrow"
+  }
+]
