@@ -7,6 +7,8 @@ objects and returns any detected compliance violations as
 """
 
 from __future__ import annotations
+__version__ = "0.2.1"
+
 
 import logging
 import os
@@ -54,7 +56,7 @@ def _call_llm(prompt: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _check_rule(text: str, rule: Rule) -> AuditLogEntry | None:
+def _check_rule(text: str, rule: Rule, rulebase_version: str) -> AuditLogEntry | None:
     """Check ``text`` against ``rule`` and return an audit entry if needed."""
 
     LOGGER.debug("Validating rule %s", rule.rule_id)
@@ -74,7 +76,9 @@ def _check_rule(text: str, rule: Rule) -> AuditLogEntry | None:
                     risk_score=None,
                     session_id="validation-session",
                     agent_stack=[__name__],
-                    rulebase_version="v1",
+                    rule_version=rule.version,
+                    agent_versions={__name__: __version__},
+                    rulebase_version=rulebase_version,
                     execution_time=None,
                 )
         elif rule.type in {"semantic", "llm"}:
@@ -95,7 +99,9 @@ def _check_rule(text: str, rule: Rule) -> AuditLogEntry | None:
                     risk_score=None,
                     session_id="validation-session",
                     agent_stack=[__name__],
-                    rulebase_version="v1",
+                    rule_version=rule.version,
+                    agent_versions={__name__: __version__},
+                    rulebase_version=rulebase_version,
                     execution_time=None,
                 )
     except Exception as exc:  # pragma: no cover - network/LLM failure
@@ -119,7 +125,9 @@ def _severity_action(sev: SeverityLevel) -> str:
 # ---------------------------------------------------------------------------
 
 
-def validate_output(output: str, rules: List[Rule]) -> Tuple[bool, List[AuditLogEntry]]:
+def validate_output(
+    output: str, rules: List[Rule], rulebase_version: str
+) -> Tuple[bool, List[AuditLogEntry]]:
     """Validate ``output`` against a list of ``rules``.
 
     Args:
@@ -136,7 +144,7 @@ def validate_output(output: str, rules: List[Rule]) -> Tuple[bool, List[AuditLog
     entries: List[AuditLogEntry] = []
     allowed = True
     for rule in rules:
-        entry = _check_rule(output, rule)
+        entry = _check_rule(output, rule, rulebase_version)
         if entry:
             entries.append(entry)
             if entry.action == "BLOCK":

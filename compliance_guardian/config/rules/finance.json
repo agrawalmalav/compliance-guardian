@@ -1,8 +1,9 @@
 # Finance domain: aligned with financial regulations. A "BLOCK" action
 # prevents execution of the financial transaction or disclosure.
-[
+{"version": "1.0.0", "rules": [
   {
     "rule_id": "FIN001",
+    "version": "1.0.0",
     "description": "Do not expose full account or credit card numbers.",
     "type": "regex",
     "severity": "high",
@@ -15,6 +16,7 @@
   },
   {
     "rule_id": "FIN002",
+    "version": "1.0.0",
     "description": "Avoid misleading guarantees of investment returns.",
     "type": "semantic",
     "severity": "medium",
@@ -27,6 +29,7 @@
   },
   {
     "rule_id": "FIN003",
+    "version": "1.0.0",
     "description": "Require customer consent before sharing financial data with third parties.",
     "type": "llm",
     "severity": "high",
@@ -39,6 +42,7 @@
   },
   {
     "rule_id": "FIN004",
+    "version": "1.0.0",
     "description": "Detect text suggesting discriminatory lending or denial based on protected attributes.",
     "type": "semantic",
     "severity": "high",
@@ -51,6 +55,7 @@
   },
   {
     "rule_id": "FIN005",
+    "version": "1.0.0",
     "description": "Prevent insider trading tips or non-public information disclosures.",
     "type": "llm",
     "severity": "high",
@@ -61,4 +66,4 @@
     "legal_reference": "https://www.law.cornell.edu/uscode/text/15/78j",
     "example_violation": "Buy shares before earnings announcement tomorrow"
   }
-]
+]}

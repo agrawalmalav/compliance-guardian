@@ -9,6 +9,11 @@ final classification result.
 
 from __future__ import annotations
 
+# Version of this agent module. Including explicit versions in logs
+# ensures audit trails can be recreated with the exact implementation
+# used when a decision was made.
+__version__ = "0.2.1"
+
 import json
 import logging
 import os

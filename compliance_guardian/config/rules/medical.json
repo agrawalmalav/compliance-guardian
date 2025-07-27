@@ -1,8 +1,9 @@
 # Medical domain: reflects HIPAA and medical ethics. A "BLOCK" action
 # halts disclosure or generation of sensitive health information.
-[
+{"version": "1.0.0", "rules": [
   {
     "rule_id": "MED001",
+    "version": "1.0.0",
     "description": "Mask patient identifiers such as patient IDs or SSNs.",
     "type": "regex",
     "severity": "high",
@@ -15,6 +16,7 @@
   },
   {
     "rule_id": "MED002",
+    "version": "1.0.0",
     "description": "Flag unsubstantiated miracle cure claims.",
     "type": "semantic",
     "severity": "medium",
@@ -27,6 +29,7 @@
   },
   {
     "rule_id": "MED003",
+    "version": "1.0.0",
     "description": "Require informed consent before using patient data for research.",
     "type": "llm",
     "severity": "high",
@@ -39,6 +42,7 @@
   },
   {
     "rule_id": "MED004",
+    "version": "1.0.0",
     "description": "Detect biased or discriminatory language in clinical notes.",
     "type": "llm",
     "severity": "high",
@@ -51,6 +55,7 @@
   },
   {
     "rule_id": "MED005",
+    "version": "1.0.0",
     "description": "Avoid copying entire copyrighted medical articles.",
     "type": "regex",
     "severity": "high",
@@ -61,4 +66,4 @@
     "legal_reference": "https://www.copyright.gov/title17/",
     "example_violation": "© 2024 Medical Journal of Examples all rights reserved"
   }
-]
+]}

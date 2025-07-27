@@ -1,6 +1,9 @@
 """Utility to load and manage domain-specific compliance rules."""
 
+
 from __future__ import annotations
+__version__ = "0.2.1"
+
 
 import json
 import logging
@@ -54,6 +57,7 @@ class RuleSelector:
         default_dir = Path(__file__).resolve().parents[1] / "config" / "rules"
         self.rules_dir = rules_dir or default_dir
         self._cache: Dict[str, List[Rule]] = {}
+        self._versions: Dict[str, str] = {}
         self._observer: Optional[Observer] = None
         self._start_watcher()
 
@@ -114,11 +118,17 @@ class RuleSelector:
         except Exception as exc:
             raise RuleLoadError(f"Failed to parse {path}: {exc}") from exc
 
-        if not isinstance(data, list):
-            raise RuleLoadError(f"Rule file {path} must contain a JSON list")
+        file_version = "0.0.0"
+        if isinstance(data, dict):
+            file_version = str(data.get("version", "0.0.0"))
+            entries = data.get("rules", [])
+        elif isinstance(data, list):
+            entries = data
+        else:
+            raise RuleLoadError(f"Rule file {path} must contain a list or object")
 
         rules: List[Rule] = []
-        for idx, entry in enumerate(data):
+        for idx, entry in enumerate(entries):
             if not isinstance(entry, dict):
                 LOGGER.error(
                     "Invalid rule entry at index %s: not an object",
@@ -136,7 +146,13 @@ class RuleSelector:
                     idx,
                     exc,
                 )
-        LOGGER.info("Loaded %d rules for domain %s", len(rules), domain)
+        self._versions[domain] = file_version
+        LOGGER.info(
+            "Loaded %d rules for domain %s (version %s)",
+            len(rules),
+            domain,
+            file_version,
+        )
         return rules
 
     # ------------------------------------------------------------
@@ -145,6 +161,11 @@ class RuleSelector:
         if domain not in self._cache:
             self._cache[domain] = self._load_file(domain)
         return self._cache[domain]
+
+    # ------------------------------------------------------------
+    def get_version(self, domain: str) -> str:
+        """Return the version string for ``domain`` rules."""
+        return self._versions.get(domain, "0.0.0")
 
     # ------------------------------------------------------------
     def reload(self, domain: str) -> None:
@@ -180,10 +201,14 @@ class RuleSelector:
         except Exception as exc:
             errors.append(f"Failed to parse {path}: {exc}")
             return errors
-        if not isinstance(data, list):
-            errors.append(f"File {path} must contain a JSON list")
+        if isinstance(data, dict):
+            entries = data.get("rules", [])
+        elif isinstance(data, list):
+            entries = data
+        else:
+            errors.append(f"File {path} must contain a list or object")
             return errors
-        for idx, entry in enumerate(data):
+        for idx, entry in enumerate(entries):
             if not isinstance(entry, dict):
                 errors.append(f"Entry {idx} is not an object")
                 continue

@@ -5,9 +5,12 @@ validate execution plans and final outputs against domain specific
 :class:`~compliance_guardian.utils.models.Rule` objects. It logs detailed
 information about any violations and returns a boolean indicating whether
 execution should proceed.
+
 """
 
 from __future__ import annotations
+__version__ = "0.2.1"
+
 
 import logging
 import os
@@ -78,6 +81,7 @@ def _build_audit_entry(
     text: str,
     reason: str,
     session_id: str = "demo-session",
+    rulebase_version: str = "v1",
 ) -> AuditLogEntry:
     """Create an :class:`AuditLogEntry` for a rule violation."""
 
@@ -98,7 +102,9 @@ def _build_audit_entry(
         risk_score=None,
         session_id=session_id,
         agent_stack=[__name__],
-        rulebase_version="v1",
+        rule_version=rule.version,
+        agent_versions={__name__: __version__},
+        rulebase_version=rulebase_version,
         execution_time=None,
     )
 
@@ -106,7 +112,9 @@ def _build_audit_entry(
 # ---------------------------------------------------------------------------
 
 
-def _check_text_against_rule(text: str, rule: Rule) -> Optional[AuditLogEntry]:
+def _check_text_against_rule(
+    text: str, rule: Rule, rulebase_version: str
+) -> Optional[AuditLogEntry]:
     """Check ``text`` against a single compliance ``rule``.
 
     Args:
@@ -124,7 +132,9 @@ def _check_text_against_rule(text: str, rule: Rule) -> Optional[AuditLogEntry]:
             if re.search(rule.pattern, text, flags=re.IGNORECASE):
                 reason = f"Pattern '{rule.pattern}' matched"
                 LOGGER.info("Regex violation for rule %s", rule.rule_id)
-                return _build_audit_entry(rule, text, reason)
+                return _build_audit_entry(
+                    rule, text, reason, rulebase_version=rulebase_version
+                )
         elif rule.type == "semantic":
             prompt = (
                 "Does the following plan violate this rule: "
@@ -133,18 +143,23 @@ def _check_text_against_rule(text: str, rule: Rule) -> Optional[AuditLogEntry]:
             response = _call_llm(prompt)
             if any(w in response.lower() for w in ("yes", "violation", "block")):
                 LOGGER.info("Semantic violation for rule %s", rule.rule_id)
-                return _build_audit_entry(rule, text, response)
+                return _build_audit_entry(
+                    rule, text, response, rulebase_version=rulebase_version
+                )
         elif rule.type == "llm" and rule.llm_instruction:
             response = _call_llm(rule.llm_instruction + "\n\n" + text)
             if any(w in response.lower() for w in ("block", "violation", "yes")):
                 LOGGER.info("LLM violation for rule %s", rule.rule_id)
-                return _build_audit_entry(rule, text, response)
+                return _build_audit_entry(
+                    rule, text, response, rulebase_version=rulebase_version
+                )
     except Exception as exc:  # pragma: no cover - network/LLM errors
         LOGGER.error("Rule check failed for %s: %s", rule.rule_id, exc)
         return _build_audit_entry(
             rule,
             text,
             reason=f"LLM check failed: {exc}",
+            rulebase_version=rulebase_version,
         )
     return None
 
@@ -153,7 +168,7 @@ def _check_text_against_rule(text: str, rule: Rule) -> Optional[AuditLogEntry]:
 
 
 def check_plan(
-    plan: PlanSummary, rules: List[Rule]
+    plan: PlanSummary, rules: List[Rule], rulebase_version: str
 ) -> Tuple[bool, Optional[AuditLogEntry]]:
     """Validate a :class:`PlanSummary` against compliance ``rules``.
 
@@ -175,7 +190,7 @@ def check_plan(
 
     LOGGER.info("Checking plan with %d rules", len(rules))
     for rule in rules:
-        entry = _check_text_against_rule(plan.action_plan, rule)
+        entry = _check_text_against_rule(plan.action_plan, rule, rulebase_version)
         if entry:
             allowed = entry.action != "BLOCK"
             LOGGER.debug("Rule %s triggered with action %s", rule.rule_id, entry.action)
@@ -188,7 +203,7 @@ def check_plan(
 
 
 def post_output_check(
-    output: str, rules: List[Rule]
+    output: str, rules: List[Rule], rulebase_version: str
 ) -> Tuple[bool, List[AuditLogEntry]]:
     """Validate final ``output`` text against ``rules``.
 
@@ -209,7 +224,7 @@ def post_output_check(
     entries: List[AuditLogEntry] = []
     allowed = True
     for rule in rules:
-        entry = _check_text_against_rule(output, rule)
+        entry = _check_text_against_rule(output, rule, rulebase_version)
         if entry:
             entries.append(entry)
             if entry.action == "BLOCK":

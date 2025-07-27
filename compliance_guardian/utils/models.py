@@ -4,7 +4,9 @@ This module defines Pydantic models used throughout the Compliance Guardian
 Agent to ensure structured data handling when performing compliance auditing for
 large language model (LLM) pipelines. The models cover rule definitions, audit
 logging, planning summaries, and session context tracking. These structures
-facilitate rigorous reproducibility that aligns with EU regulations.
+facilitate rigorous reproducibility that aligns with EU regulations.  Each
+model carries explicit version information so historical decisions can be
+recreated exactly with the same rule and agent versions.
 
 Example:
     >>> from compliance_guardian.utils.models import Rule, RuleType, SeverityLevel, ComplianceDomain
@@ -74,6 +76,10 @@ class Rule(BaseModel):
     """
 
     rule_id: str = Field(..., description="Unique identifier for this rule.")
+    version: str = Field(
+        "1.0.0",
+        description="Version identifier for this rule allowing full traceability",
+    )
     description: str = Field(..., description="Human-readable rule description.")
     type: RuleType = Field(..., description="Category of the rule.")
     severity: SeverityLevel = Field(..., description="Impact severity if violated.")
@@ -143,6 +149,8 @@ class AuditLogEntry(BaseModel):
         risk_score: Numerical risk score.
         session_id: Identifier for the session associated.
         agent_stack: List of agents involved.
+        rule_version: Version of the specific rule triggered.
+        agent_versions: Mapping of agent names to their versions.
         rulebase_version: Version of the rulebase in use.
         execution_time: Time taken to execute in seconds.
     """
@@ -163,6 +171,13 @@ class AuditLogEntry(BaseModel):
     session_id: str = Field(..., description="Identifier for the associated session.")
     agent_stack: List[str] = Field(
         default_factory=list, description="List of agents involved."
+    )
+    rule_version: Optional[str] = Field(
+        None, description="Version of the rule that triggered this entry."
+    )
+    agent_versions: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Versions of agents contributing to the decision.",
     )
     rulebase_version: Optional[str] = Field(
         None, description="Version of the rulebase in use."

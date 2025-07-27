@@ -5,6 +5,8 @@ The functions here write structured :class:`AuditLogEntry` objects to the
 first calling :func:`compliance_guardian.utils.i18n.translate_explanation` and
 then :func:`compliance_guardian.utils.i18n.log_multilingual_explanation` to
 append the translated text to the audit log.
+Each log entry records rule, agent and rulebase versions so that audits can
+replay decisions under the exact same conditions.
 """
 
 from __future__ import annotations
@@ -123,6 +125,9 @@ def log_session_report(entries: List[AuditLogEntry], file_path: str) -> None:
         summary = [
             {
                 "rule_id": e.rule_id,
+                "rule_version": e.rule_version,
+                "agent_versions": e.agent_versions,
+                "rulebase_version": e.rulebase_version,
                 "clause": e.clause_id,
                 "action": e.action,
                 "risk_score": e.risk_score,
@@ -133,12 +138,20 @@ def log_session_report(entries: List[AuditLogEntry], file_path: str) -> None:
         yaml_block = json.dumps({"run_hash": _RUN_HASH, "entries": summary}, indent=2)
 
         table_lines = [
-            "| rule_id | clause | action | risk_score |",
-            "| --- | --- | --- | --- |",
+            "| rule_id | r_ver | agents | rulebase | clause | action | risk_score |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
         ]
         for s in summary:
             table_lines.append(
-                f"| {s['rule_id']} | {s['clause'] or ''} | {s['action']} | {s['risk_score'] or ''} |"
+                "| {rule_id} | {rver} | {agents} | {rbase} | {clause} | {action} | {risk}|".format(
+                    rule_id=s["rule_id"],
+                    rver=s.get("rule_version") or "",
+                    agents=";".join(f"{k}:{v}" for k, v in s.get("agent_versions", {}).items()),
+                    rbase=s.get("rulebase_version") or "",
+                    clause=s["clause"] or "",
+                    action=s["action"],
+                    risk=s["risk_score"] or "",
+                )
             )
         table = "\n".join(table_lines)
 
