@@ -82,6 +82,18 @@ sphinx-build -b html . _build
 
 The generated HTML will be available in `docs/_build`.
 
+## Exporting Appendix Materials
+
+Use the `export_appendix.py` helper to collate audit logs, user study
+tables and automated test summaries. Specify the desired output format
+(Markdown, LaTeX or PDF):
+
+```bash
+python export_appendix.py --format latex
+```
+
+The resulting file is written to `exports/appendix_export.tex`.
+
 ## Adding Rules or Domains
 
 Rule files live in `compliance_guardian/config/rules/DOMAIN.json`. Each rule
