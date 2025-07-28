@@ -75,6 +75,9 @@ python scripts/json_validate.py compliance_guardian/datasets/test_scenarios.json
 ```
 
 See `notebooks/Demo.ipynb` for an interactive walkthrough.
+When running the notebook, execute all cells sequentially ("Run All" or
+"Restart & Run All") to ensure that variables defined in earlier cells are
+available for later steps. Skipping a cell can lead to `NameError` exceptions.
 
 Documentation is built with Sphinx:
 
