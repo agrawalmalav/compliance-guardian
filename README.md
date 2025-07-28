@@ -69,6 +69,8 @@ flake8
 mypy compliance_guardian
 pytest -q
 python eval.py
+# Check JSON files
+python scripts/json_validate.py compliance_guardian/datasets/test_scenarios.json
 ```
 
 See `notebooks/Demo.ipynb` for an interactive walkthrough.
