@@ -30,12 +30,14 @@ def _call_llm(prompt: str) -> str:
     """Call an available LLM and return the raw response."""
     if openai and os.getenv("OPENAI_API_KEY"):
         model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
-        resp = openai.ChatCompletion.create(
+        client = openai.OpenAI()
+        resp = client.chat.completions.create(
             model=model,
             messages=[{"role": "system", "content": prompt}],
             temperature=0,
         )
-        return resp["choices"][0]["message"]["content"].strip()
+        content = resp.choices[0].message.content or ""
+        return content.strip()
     if genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         model = genai.GenerativeModel("gemini-pro")

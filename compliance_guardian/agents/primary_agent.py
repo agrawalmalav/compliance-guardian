@@ -24,7 +24,7 @@ __version__ = "0.2.1"
 import json
 import logging
 import os
-from typing import List
+from typing import List, Sequence, Dict
 
 try:
     import openai  # type: ignore
@@ -62,11 +62,16 @@ def _coerce_domain(domain: str) -> ComplianceDomain:
 # ---------------------------------------------------------------------------
 
 
-def _call_llm(messages: List[dict]) -> str:
+def _call_llm(messages: Sequence[Dict[str, str]]) -> str:
     """Internal helper to call either OpenAI or Gemini models."""
     if openai and os.getenv("OPENAI_API_KEY"):
-        resp = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=messages)
-        return resp["choices"][0]["message"]["content"].strip()
+        client = openai.OpenAI()
+        resp = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,  # type: ignore[arg-type]
+        )
+        content = resp.choices[0].message.content or ""
+        return content.strip()
     if genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         model = genai.GenerativeModel("gemini-pro")
@@ -190,10 +195,15 @@ def _demo() -> None:
 
     dummy_rule = Rule(
         rule_id="GEN001",
+        version="1.0.0",
         description="Respond politely and keep answers concise.",
         type=RuleType.PROCEDURAL,
         severity=SeverityLevel.LOW,
         domain=ComplianceDomain.OTHER,
+        pattern=None,
+        llm_instruction=None,
+        legal_reference=None,
+        example_violation=None,
     )
 
     for dom, prmpt in samples.items():
