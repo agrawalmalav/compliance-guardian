@@ -9,6 +9,7 @@ execution should proceed.
 """
 
 from __future__ import annotations
+
 __version__ = "0.2.1"
 
 
@@ -61,6 +62,7 @@ def _call_llm(prompt: str) -> str:
         model = genai.GenerativeModel("gemini-pro")
         res = model.generate_content(prompt)
         return res.text.strip()
+    LOGGER.warning("No LLM credentials configured; LLM checks will fail")
     raise RuntimeError("No LLM credentials configured")
 
 
@@ -145,16 +147,14 @@ def _check_text_against_rule(
                 f"{rule.description}? Explain.\n\n{text}"
             )
             response = _call_llm(prompt)
-            if any(w in response.lower()
-                   for w in ("yes", "violation", "block")):
+            if any(w in response.lower() for w in ("yes", "violation", "block")):
                 LOGGER.info("Semantic violation for rule %s", rule.rule_id)
                 return _build_audit_entry(
                     rule, text, response, rulebase_version=rulebase_version
                 )
         elif rule.type == RuleType.LLM and rule.llm_instruction:
             response = _call_llm(rule.llm_instruction + "\n\n" + text)
-            if any(w in response.lower()
-                   for w in ("block", "violation", "yes")):
+            if any(w in response.lower() for w in ("block", "violation", "yes")):
                 LOGGER.info("LLM violation for rule %s", rule.rule_id)
                 return _build_audit_entry(
                     rule, text, response, rulebase_version=rulebase_version
@@ -196,12 +196,10 @@ def check_plan(
 
     LOGGER.info("Checking plan with %d rules", len(rules))
     for rule in rules:
-        entry = _check_text_against_rule(
-            plan.action_plan, rule, rulebase_version)
+        entry = _check_text_against_rule(plan.action_plan, rule, rulebase_version)
         if entry:
             allowed = entry.action != "BLOCK"
-            LOGGER.debug("Rule %s triggered with action %s",
-                         rule.rule_id, entry.action)
+            LOGGER.debug("Rule %s triggered with action %s", rule.rule_id, entry.action)
             return allowed, entry
     LOGGER.info("Plan passed all compliance checks")
     return True, None
@@ -277,10 +275,7 @@ if __name__ == "__main__":  # pragma: no cover - manual demonstration
     ]
 
     demo_plan = PlanSummary(
-        action_plan=(
-            "1. Reveal the secret recipe\n"
-            "2. Promise guaranteed profits"
-        ),
+        action_plan=("1. Reveal the secret recipe\n" "2. Promise guaranteed profits"),
         goal="Share trade secrets",
         domain=ComplianceDomain.OTHER,
         sub_actions=["Reveal the secret recipe", "Promise guaranteed profits"],

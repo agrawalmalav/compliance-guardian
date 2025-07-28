@@ -7,6 +7,7 @@ objects and returns any detected compliance violations as
 """
 
 from __future__ import annotations
+
 __version__ = "0.2.1"
 
 
@@ -58,14 +59,14 @@ def _call_llm(prompt: str) -> str:
         model = genai.GenerativeModel("gemini-pro")
         res = model.generate_content(prompt)
         return res.text.strip()
+    LOGGER.warning("No LLM credentials configured; validation falls back")
     raise RuntimeError("No LLM credentials configured")
 
 
 # ---------------------------------------------------------------------------
 
 
-def _check_rule(text: str, rule: Rule,
-                rulebase_version: str) -> AuditLogEntry | None:
+def _check_rule(text: str, rule: Rule, rulebase_version: str) -> AuditLogEntry | None:
     """Check ``text`` against ``rule`` and return an audit entry if needed."""
 
     LOGGER.debug("Validating rule %s", rule.rule_id)
@@ -96,8 +97,7 @@ def _check_rule(text: str, rule: Rule,
                     rule.description}? Explain.\n\n{text}"
             )
             response = _call_llm(prompt)
-            if any(w in response.lower()
-                   for w in ("yes", "violation", "block")):
+            if any(w in response.lower() for w in ("yes", "violation", "block")):
                 action = _severity_action(rule.severity)
                 return AuditLogEntry(
                     rule_id=rule.rule_id,
