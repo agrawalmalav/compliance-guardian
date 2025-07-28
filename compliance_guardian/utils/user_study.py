@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -55,13 +54,17 @@ def record_user_feedback(
     )
 
     header = (
-        "| timestamp | scenario_id | prompt | action | explanation | rating | comment |\n"
+        "| timestamp | scenario_id | prompt | action | explanation | rating | "
+        "comment |\n"
         "| --- | --- | --- | --- | --- | --- | --- |"
     )
 
     try:
         _REPORT_FILE.parent.mkdir(parents=True, exist_ok=True)
-        if not _REPORT_FILE.exists() or not _REPORT_FILE.read_text(encoding="utf-8").strip():
+        if (
+            not _REPORT_FILE.exists()
+            or not _REPORT_FILE.read_text(encoding="utf-8").strip()
+        ):
             _REPORT_FILE.write_text(header + "\n", encoding="utf-8")
         with _REPORT_FILE.open("a", encoding="utf-8") as fh:
             fh.write(line + "\n")
@@ -78,12 +81,30 @@ app = typer.Typer(help="Collect or append user study feedback")
 
 @app.command()
 def collect(
-    scenario_id: str = typer.Option(..., "--scenario-id", prompt=True, help="Scenario identifier"),
-    prompt: str = typer.Option(..., "--prompt", prompt=True, help="Original prompt"),
-    action_taken: str = typer.Option(..., "--action", prompt=True, help="Compliance action taken"),
-    explanation_shown: str = typer.Option("", "--explanation", prompt="Explanation shown", help="Explanation presented"),
-    rating: int = typer.Option(..., "--rating", prompt=True, min=1, max=5, help="User rating 1-5"),
-    user_comment: str = typer.Option("", "--comment", prompt="Additional comments", help="Optional feedback"),
+    scenario_id: str = typer.Option(
+        ..., "--scenario-id", prompt=True, help="Scenario identifier"
+    ),
+    prompt: str = typer.Option(
+        ..., "--prompt", prompt=True, help="Original prompt"
+    ),
+    action_taken: str = typer.Option(
+        ..., "--action", prompt=True, help="Compliance action taken"
+    ),
+    explanation_shown: str = typer.Option(
+        "",
+        "--explanation",
+        prompt="Explanation shown",
+        help="Explanation presented",
+    ),
+    rating: int = typer.Option(
+        ..., "--rating", prompt=True, min=1, max=5, help="User rating 1-5"
+    ),
+    user_comment: str = typer.Option(
+        "",
+        "--comment",
+        prompt="Additional comments",
+        help="Optional feedback",
+    ),
 ) -> None:
     """CLI entry point for recording a single feedback event."""
 

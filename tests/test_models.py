@@ -1,6 +1,5 @@
 # tests/test_models.py
 """Example CLI: pytest -vv tests/test_models.py"""
-import json
 import pytest
 
 from compliance_guardian.utils import models

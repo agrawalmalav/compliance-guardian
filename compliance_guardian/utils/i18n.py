@@ -13,9 +13,9 @@ any available provider in the following order:
 3. The community ``googletrans`` package as a lightweight fall back.
 
 If none of the providers are available or an error occurs, the original text is
-returned and the issue is logged. A ``translation_source`` string describing the
-provider and version used is included with each successful translation so that
-log entries can be audited.
+returned and the issue is logged. A ``translation_source`` string
+describing the provider and version used is included with each successful
+translation so that log entries can be audited.
 """
 
 from __future__ import annotations
@@ -34,8 +34,8 @@ from .models import AuditLogEntry, SessionContext
 LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# Paths reused from ``log_writer`` so that translated explanations end up in the
-# same audit log file.
+# Paths reused from ``log_writer`` so that translated explanations end up in
+# the same audit log file.
 _BASE_DIR = Path(__file__).resolve().parents[1]
 _LOG_DIR = _BASE_DIR / "logs"
 _LOG_FILE = _LOG_DIR / "audit_log.jsonl"
@@ -43,7 +43,8 @@ _LOG_SIZE_LIMIT = 5 * 1024 * 1024  # 5 MB
 
 # Unique identifier so that all translation events for the same run can be
 # correlated with other log entries written by :mod:`log_writer`.
-_RUN_HASH = hashlib.sha256(str(datetime.utcnow().timestamp()).encode()).hexdigest()[:8]
+_RUN_HASH = hashlib.sha256(
+    str(datetime.utcnow().timestamp()).encode()).hexdigest()[:8]
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +115,8 @@ def translate_explanation(text: str, target_lang: str = "fr") -> str:
 
             if os.getenv("OPENAI_API_KEY"):
                 prompt = (
-                    f"Translate the following explanation to {target_lang}:\n\n{text}"
+                    "Translate the following explanation to "
+                    f"{target_lang}:\n\n{text}"
                 )
                 client = openai.OpenAI()
                 resp = client.chat.completions.create(
@@ -122,7 +124,9 @@ def translate_explanation(text: str, target_lang: str = "fr") -> str:
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0,
                 )
-                translated = (resp.choices[0].message.content or "").strip()
+                translated = (
+                    resp.choices[0].message.content or ""
+                ).strip()
                 provider = "openai/gpt-3.5-turbo"
             else:
                 raise RuntimeError("OPENAI_API_KEY not set")
@@ -143,11 +147,14 @@ def translate_explanation(text: str, target_lang: str = "fr") -> str:
 
     if translated == text:
         LOGGER.warning(
-            "Translation unavailable; returning original text for %s", target_lang
+            "Translation unavailable; returning original text for %s",
+            target_lang,
         )
     else:
         LOGGER.info(
-            "Translated explanation via %s to %s", provider, target_lang
+            "Translated explanation via %s to %s",
+            provider,
+            target_lang,
         )
     return translated
 
@@ -165,10 +172,11 @@ def log_multilingual_explanation(
 ) -> None:
     """Store ``log_entry`` with ``translated_text`` in the audit log.
 
-    The function mirrors :func:`log_writer.log_decision` but includes additional
-    fields: ``translated_explanation`` (the translated text), ``translation_lang``
-    and ``translation_source``. This allows downstream consumers to reconstruct
-    how and when a particular translation was produced.
+    The function mirrors :func:`log_writer.log_decision` but includes
+    additional fields: ``translated_explanation`` (the translated text),
+    ``translation_lang`` and ``translation_source``. This allows
+    downstream consumers to reconstruct how and when a particular
+    translation was produced.
     """
 
     try:
@@ -201,4 +209,3 @@ if __name__ == "__main__":  # pragma: no cover - demonstration
     for lang in ["fr", "de", "hi", "zh"]:
         t = translate_explanation(SAMPLE, lang)
         print(f"{lang}: {t}")
-

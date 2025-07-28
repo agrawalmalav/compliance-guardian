@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Self-test script for the Compliance Guardian agent.
 
-This utility imports major modules and performs quick sanity checks to
-verify that the environment and rulebase are functioning correctly. It
-catches and logs all exceptions so failures in one stage do not stop the
-entire script.  A Markdown report is written to ``reports/self_test_summary.md``
-for supervisors to review.
+This utility imports major modules and performs quick sanity checks to verify
+that the environment and rulebase are functioning correctly. It catches and
+logs all exceptions so failures in one stage do not stop the entire script.
+A Markdown report is written to ``reports/self_test_summary.md`` for
+supervisors to review.
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 import logging
-import sys
 from typing import List, Optional
 
 
@@ -45,8 +44,9 @@ RESULTS: List[TestResult] = []
 # Helper functions for each module
 # ---------------------------------------------------------------------------
 
-def record_result(module: str, test: str, status: str, error: Optional[str] = None) -> None:
-    """Append a :class:`TestResult` to the global ``RESULTS`` list and log it."""
+def record_result(module: str, test: str, status: str,
+                  error: Optional[str] = None) -> None:
+    """Append a :class:`TestResult` to the ``RESULTS`` list and log it."""
     RESULTS.append(TestResult(module, test, status, error))
     if status == "PASS":
         LOGGER.info("%s: %s - PASS", module, test)
@@ -77,7 +77,7 @@ def test_models() -> None:
         rule_dict = rule.to_dict()
         assert rule_dict["rule_id"] == "TST001"
 
-        plan = models.PlanSummary(
+        _ = models.PlanSummary(
             action_plan="1. do something",
             goal="do something",
             domain=models.ComplianceDomain.OTHER,
@@ -126,7 +126,8 @@ def test_domain_classifier() -> None:
     try:
         from compliance_guardian.agents import domain_classifier
 
-        domain = domain_classifier.classify_domain("How do I invest in stocks?")
+        domain = domain_classifier.classify_domain(
+            "How do I invest in stocks?")
         if domain != "finance":
             raise AssertionError(f"expected 'finance' got '{domain}'")
         record_result(module, test, "PASS")
@@ -183,7 +184,8 @@ def test_compliance_agent() -> None:
         allowed, entry = compliance_agent.check_plan(plan, [rule], "v1")
         if not allowed and entry:
             LOGGER.info("Compliance violation detected as expected")
-        allowed2, _ = compliance_agent.post_output_check("secret", [rule], "v1")
+        allowed2, _ = compliance_agent.post_output_check("secret", [
+                                                         rule], "v1")
         if not allowed2:
             LOGGER.info("Post check detected violation as expected")
         record_result(module, test, "PASS")

@@ -24,7 +24,8 @@ LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # Compute a unique run hash at module import time to link all log lines
-_RUN_HASH = hashlib.sha256(str(datetime.utcnow().timestamp()).encode()).hexdigest()[:8]
+_RUN_HASH = hashlib.sha256(
+    str(datetime.utcnow().timestamp()).encode()).hexdigest()[:8]
 
 # Base directories relative to the repository
 _BASE_DIR = Path(__file__).resolve().parents[1]
@@ -71,14 +72,14 @@ def log_decision(
         Structured audit log entry describing an event.
     session:
         Optional session context to embed alongside the entry.
-    
+
     Notes
     -----
     To produce multilingual logs call
     :func:`compliance_guardian.utils.i18n.translate_explanation` with
     ``log_entry.justification`` and then
-    :func:`compliance_guardian.utils.i18n.log_multilingual_explanation` to store
-    the translated text alongside the base entry.
+    :func:`compliance_guardian.utils.i18n.log_multilingual_explanation` to
+    store the translated text alongside the base entry.
     """
 
     try:
@@ -135,10 +136,14 @@ def log_session_report(entries: List[AuditLogEntry], file_path: str) -> None:
             for e in entries
         ]
 
-        yaml_block = json.dumps({"run_hash": _RUN_HASH, "entries": summary}, indent=2)
+        yaml_block = json.dumps(
+            {"run_hash": _RUN_HASH, "entries": summary},
+            indent=2,
+        )
 
         table_lines = [
-            "| rule_id | r_ver | agents | rulebase | clause | action | risk_score |",
+            "| rule_id | r_ver | agents | rulebase | clause | action |"
+            " risk_score |",
             "| --- | --- | --- | --- | --- | --- | --- |",
         ]
         for s in summary:
@@ -148,7 +153,8 @@ def log_session_report(entries: List[AuditLogEntry], file_path: str) -> None:
             else:
                 agents = ""
             table_lines.append(
-                "| {rule_id} | {rver} | {agents} | {rbase} | {clause} | {action} | {risk}|".format(
+                "| {rule_id} | {rver} | {agents} | {rbase} | {clause} | "
+                "{action} | {risk}|".format(
                     rule_id=s["rule_id"],
                     rver=s.get("rule_version") or "",
                     agents=agents,
@@ -161,7 +167,8 @@ def log_session_report(entries: List[AuditLogEntry], file_path: str) -> None:
         table = "\n".join(table_lines)
 
         content = (
-            f"# ISO/EU Governance Mapping\n\nGenerated: {datetime.utcnow().isoformat()} UTC\n\n"
+            "# ISO/EU Governance Mapping\n\nGenerated: "
+            f"{datetime.utcnow().isoformat()} UTC\n\n"
             f"```yaml\n{yaml_block}\n```\n\n{table}\n"
         )
         path.write_text(content, encoding="utf-8")

@@ -1,7 +1,6 @@
 # tests/test_log_writer.py
 """Example CLI: pytest -vv tests/test_log_writer.py"""
 import json
-from pathlib import Path
 
 import pytest
 
@@ -17,7 +16,8 @@ class TestLogWriter:
         report_dir = tmp_path / "reports"
         monkeypatch.setattr(log_writer, "_LOG_DIR", log_dir)
         monkeypatch.setattr(log_writer, "_REPORT_DIR", report_dir)
-        monkeypatch.setattr(log_writer, "_LOG_FILE", log_dir / "audit_log.jsonl")
+        monkeypatch.setattr(log_writer, "_LOG_FILE",
+                            log_dir / "audit_log.jsonl")
         return log_dir, report_dir
 
     def sample_entry(self):

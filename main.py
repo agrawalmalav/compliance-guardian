@@ -108,7 +108,9 @@ def run_pipeline(
             session_id=session_id,
             agent_stack=["domain_classifier"],
             rule_version=None,
-            agent_versions={"domain_classifier": domain_classifier.__version__},
+            agent_versions={
+                "domain_classifier": domain_classifier.__version__
+            },
             rulebase_version=None,
             execution_time=duration,
         )

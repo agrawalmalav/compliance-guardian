@@ -131,7 +131,8 @@ class RuleSelector:
         elif isinstance(data, list):
             entries = data
         else:
-            raise RuleLoadError(f"Rule file {path} must contain a list or object")
+            raise RuleLoadError(
+                f"Rule file {path} must contain a list or object")
 
         rules: List[Rule] = []
         for idx, entry in enumerate(entries):

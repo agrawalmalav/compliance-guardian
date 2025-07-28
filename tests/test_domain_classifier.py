@@ -2,8 +2,6 @@
 """Example CLI: pytest -vv tests/test_domain_classifier.py"""
 from unittest.mock import patch
 
-import pytest
-
 from compliance_guardian.agents import domain_classifier
 
 
@@ -11,9 +9,18 @@ class TestDomainClassifier:
     """Keyword and LLM based domain classification."""
 
     def test_keyword_detection(self):
-        assert domain_classifier.classify_domain("Please scrape data") == "scraping"
-        assert domain_classifier.classify_domain("Stock prices today") == "finance"
-        assert domain_classifier.classify_domain("patient diagnosis") == "medical"
+        assert (
+            domain_classifier.classify_domain("Please scrape data")
+            == "scraping"
+        )
+        assert (
+            domain_classifier.classify_domain("Stock prices today")
+            == "finance"
+        )
+        assert (
+            domain_classifier.classify_domain("patient diagnosis")
+            == "medical"
+        )
 
     def test_llm_fallback(self):
         with patch.object(

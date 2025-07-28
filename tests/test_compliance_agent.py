@@ -63,8 +63,12 @@ class TestComplianceAgent:
             sub_actions=["x"],
             original_prompt="p",
         )
-        with patch.object(compliance_agent, "_call_llm", return_value="Yes violation"):
-            allowed, entry = compliance_agent.check_plan(plan, [semantic_rule], "v1")
+        with patch.object(
+            compliance_agent, "_call_llm", return_value="Yes violation"
+        ):
+            allowed, entry = compliance_agent.check_plan(
+                plan, [semantic_rule], "v1"
+            )
             assert not allowed
             assert entry and "violation" in entry.justification.lower()
 
@@ -77,13 +81,19 @@ class TestComplianceAgent:
             original_prompt="p",
         )
         with patch.object(
-            compliance_agent, "_call_llm", side_effect=RuntimeError("boom")
+            compliance_agent,
+            "_call_llm",
+            side_effect=RuntimeError("boom"),
         ):
-            allowed, entry = compliance_agent.check_plan(plan, [semantic_rule], "v1")
+            allowed, entry = compliance_agent.check_plan(
+                plan, [semantic_rule], "v1"
+            )
             assert not allowed
             assert entry and "failed" in entry.justification
 
     def test_post_output_check(self, regex_rule):
-        allowed, entries = compliance_agent.post_output_check("foo bar", [regex_rule], "v1")
+        allowed, entries = compliance_agent.post_output_check(
+            "foo bar", [regex_rule], "v1"
+        )
         assert not allowed
         assert entries and entries[0].rule_id == "R"
