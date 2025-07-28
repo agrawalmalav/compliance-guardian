@@ -62,7 +62,8 @@ The translated text and the provider used are appended to `logs/audit_log.jsonl`
 
 ## Running Tests and Demo
 
-Run static checks and the demo scenarios:
+Run static checks and the demo scenarios. The evaluation dataset is stored at
+`compliance_guardian/datasets/test_scenarios.json`:
 
 ```bash
 flake8
