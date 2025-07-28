@@ -54,12 +54,14 @@ def _llm_classify(prompt: str) -> str:
     LOGGER.info("Invoking LLM for domain classification")
     try:
         if openai and os.getenv("OPENAI_API_KEY"):
-            resp = openai.ChatCompletion.create(
+            client = openai.OpenAI()
+            resp = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "system", "content": system}],
                 temperature=0,
             )
-            text = resp["choices"][0]["message"]["content"].strip().lower()
+            raw = resp.choices[0].message.content or ""
+            text = raw.strip().lower()
         elif genai and os.getenv("GEMINI_API_KEY"):
             genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
             model = genai.GenerativeModel("gemini-pro")

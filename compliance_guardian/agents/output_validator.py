@@ -15,7 +15,13 @@ import os
 import re
 from typing import List, Tuple
 
-from compliance_guardian.utils.models import AuditLogEntry, Rule, SeverityLevel
+from compliance_guardian.utils.models import (
+    AuditLogEntry,
+    Rule,
+    SeverityLevel,
+    RuleType,
+    ComplianceDomain,
+)
 
 try:
     import openai  # type: ignore
@@ -39,12 +45,14 @@ def _call_llm(prompt: str) -> str:
 
     LOGGER.debug("LLM prompt: %s", prompt)
     if openai and os.getenv("OPENAI_API_KEY"):
-        resp = openai.ChatCompletion.create(
+        client = openai.OpenAI()
+        resp = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "system", "content": prompt}],
             temperature=0,
         )
-        return resp["choices"][0]["message"]["content"].strip()
+        content = resp.choices[0].message.content or ""
+        return content.strip()
     if genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         model = genai.GenerativeModel("gemini-pro")
@@ -164,29 +172,38 @@ if __name__ == "__main__":  # pragma: no cover - manual tests
     test_rules = [
         Rule(
             rule_id="VAL1",
+            version="1.0.0",
             description="Do not reveal passwords",
-            type="regex",
+            type=RuleType.PROCEDURAL,
             severity=SeverityLevel.HIGH,
-            domain="other",
-            pattern=r"password\\s*[:=]\\s*\\w+",
+            domain=ComplianceDomain.OTHER,
+            pattern=r"password\s*[:=]\s*\w+",
+            llm_instruction=None,
+            legal_reference=None,
+            example_violation=None,
         ),
         Rule(
             rule_id="VAL2",
+            version="1.0.0",
             description="Avoid defamatory language",
-            type="semantic",
+            type=RuleType.PROCEDURAL,
             severity=SeverityLevel.MEDIUM,
-            domain="other",
+            domain=ComplianceDomain.OTHER,
+            pattern=None,
+            llm_instruction=None,
+            legal_reference=None,
+            example_violation=None,
         ),
     ]
 
     sample_text = "The admin password: hunter2 should never be shared."
-    allowed, logs = validate_output(sample_text, test_rules)
+    allowed, logs = validate_output(sample_text, test_rules, "1.0.0")
     print("Allowed:", allowed)
     for log in logs:
         print(log.model_dump_json(indent=2))
 
     sample_text2 = "You are an idiot and everyone knows it."
-    allowed2, logs2 = validate_output(sample_text2, test_rules)
+    allowed2, logs2 = validate_output(sample_text2, test_rules, "1.0.0")
     print("Allowed2:", allowed2)
     for log in logs2:
         print(log.model_dump_json(indent=2))

@@ -116,12 +116,13 @@ def translate_explanation(text: str, target_lang: str = "fr") -> str:
                 prompt = (
                     f"Translate the following explanation to {target_lang}:\n\n{text}"
                 )
-                resp = openai.ChatCompletion.create(
+                client = openai.OpenAI()
+                resp = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0,
                 )
-                translated = resp["choices"][0]["message"]["content"].strip()
+                translated = (resp.choices[0].message.content or "").strip()
                 provider = "openai/gpt-3.5-turbo"
             else:
                 raise RuntimeError("OPENAI_API_KEY not set")

@@ -142,15 +142,20 @@ def log_session_report(entries: List[AuditLogEntry], file_path: str) -> None:
             "| --- | --- | --- | --- | --- | --- | --- |",
         ]
         for s in summary:
+            agents_field = s.get("agent_versions")
+            if isinstance(agents_field, dict):
+                agents = ";".join(f"{k}:{v}" for k, v in agents_field.items())
+            else:
+                agents = ""
             table_lines.append(
                 "| {rule_id} | {rver} | {agents} | {rbase} | {clause} | {action} | {risk}|".format(
                     rule_id=s["rule_id"],
                     rver=s.get("rule_version") or "",
-                    agents=";".join(f"{k}:{v}" for k, v in s.get("agent_versions", {}).items()),
+                    agents=agents,
                     rbase=s.get("rulebase_version") or "",
-                    clause=s["clause"] or "",
+                    clause=s.get("clause") or "",
                     action=s["action"],
-                    risk=s["risk_score"] or "",
+                    risk=s.get("risk_score") or "",
                 )
             )
         table = "\n".join(table_lines)

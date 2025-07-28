@@ -9,10 +9,16 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from watchdog.events import FileSystemEventHandler
-from watchdog.observers import Observer
+from watchdog.observers import Observer as WatchdogObserver
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover
+    from watchdog.observers import Observer
+else:  # pragma: no cover
+    Observer = WatchdogObserver
 import typer
 
 from compliance_guardian.utils.models import Rule, ComplianceDomain
@@ -58,7 +64,7 @@ class RuleSelector:
         self.rules_dir = rules_dir or default_dir
         self._cache: Dict[str, List[Rule]] = {}
         self._versions: Dict[str, str] = {}
-        self._observer: Optional[Observer] = None
+        self._observer: Optional[Any] = None
         self._start_watcher()
 
     # ------------------------------------------------------------

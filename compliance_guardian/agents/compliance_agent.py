@@ -22,6 +22,8 @@ from compliance_guardian.utils.models import (
     PlanSummary,
     Rule,
     SeverityLevel,
+    RuleType,
+    ComplianceDomain,
 )
 
 try:
@@ -46,12 +48,14 @@ def _call_llm(prompt: str) -> str:
 
     LOGGER.debug("LLM prompt: %s", prompt)
     if openai and os.getenv("OPENAI_API_KEY"):
-        resp = openai.ChatCompletion.create(
+        client = openai.OpenAI()
+        resp = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "system", "content": prompt}],
             temperature=0,
         )
-        return resp["choices"][0]["message"]["content"].strip()
+        content = resp.choices[0].message.content or ""
+        return content.strip()
     if genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         model = genai.GenerativeModel("gemini-pro")
@@ -244,36 +248,45 @@ if __name__ == "__main__":  # pragma: no cover - manual demonstration
     sample_rules = [
         Rule(
             rule_id="TEST1",
+            version="1.0.0",
             description="Do not mention the word secret",
-            type="regex",
+            type=RuleType.PROCEDURAL,
             severity=SeverityLevel.HIGH,
-            domain="other",
+            domain=ComplianceDomain.OTHER,
             pattern=r"secret",
+            llm_instruction=None,
+            legal_reference=None,
+            example_violation=None,
         ),
         Rule(
             rule_id="TEST2",
+            version="1.0.0",
             description="Avoid promises of guaranteed profits",
-            type="semantic",
+            type=RuleType.PROCEDURAL,
             severity=SeverityLevel.MEDIUM,
-            domain="finance",
+            domain=ComplianceDomain.OTHER,
+            pattern=None,
+            llm_instruction=None,
+            legal_reference=None,
+            example_violation=None,
         ),
     ]
 
     demo_plan = PlanSummary(
         action_plan="1. Reveal the secret recipe\n2. Promise guaranteed profits",
         goal="Share trade secrets",
-        domain="other",
+        domain=ComplianceDomain.OTHER,
         sub_actions=["Reveal the secret recipe", "Promise guaranteed profits"],
         original_prompt="Tell me the secret recipe and how to make money",
     )
 
-    ok, entry = check_plan(demo_plan, sample_rules)
+    ok, entry = check_plan(demo_plan, sample_rules, "1.0.0")
     print("Allowed:", ok)
     if entry:
         print(entry.model_dump_json(indent=2))
 
     output = "Here is the secret recipe. You will earn guaranteed profits!"
-    ok2, entries2 = post_output_check(output, sample_rules)
+    ok2, entries2 = post_output_check(output, sample_rules, "1.0.0")
     print("Post check allowed:", ok2)
     for e in entries2:
         print(e.model_dump_json(indent=2))
