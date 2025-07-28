@@ -1,7 +1,7 @@
 langchain
 langgraph
 openai
-google-generativeai
+google - generativeai
 pyyaml
 watchdog
 pydantic
@@ -14,3 +14,4 @@ flake8
 black
 typer
 
+pypandoc
