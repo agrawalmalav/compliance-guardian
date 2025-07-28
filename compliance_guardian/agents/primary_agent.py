@@ -18,6 +18,7 @@ the function logs the event and aborts gracefully.
 """
 
 from __future__ import annotations
+
 __version__ = "0.2.1"
 
 
@@ -77,6 +78,7 @@ def _call_llm(messages: Sequence[Dict[str, str]]) -> str:
         model = genai.GenerativeModel("gemini-pro")
         res = model.generate_content("\n".join(m["content"] for m in messages))
         return res.text.strip()
+    LOGGER.warning("No LLM credentials configured; falling back to demo plan")
     raise RuntimeError("No LLM credentials configured")
 
 
@@ -99,8 +101,7 @@ def generate_plan(prompt: str, domain: str) -> PlanSummary:
         Parsed :class:`PlanSummary` describing the strategy.
     """
 
-    LOGGER.info("Generating plan for domain '%s' with prompt: %s",
-                domain, prompt)
+    LOGGER.info("Generating plan for domain '%s' with prompt: %s", domain, prompt)
     plan_system = (
         "You are a task planner for an AI assistant. "
         "Given the prompt: {prompt}, decompose into step-by-step actions "
@@ -115,8 +116,7 @@ def generate_plan(prompt: str, domain: str) -> PlanSummary:
         steps = parsed.get("steps", [])
         if not isinstance(steps, list):
             raise ValueError("'steps' must be a list")
-        action_plan = "\n".join(
-            f"{idx + 1}. {step}" for idx, step in enumerate(steps))
+        action_plan = "\n".join(f"{idx + 1}. {step}" for idx, step in enumerate(steps))
         LOGGER.info("Received plan with %d steps", len(steps))
     except Exception as exc:  # pragma: no cover - network/JSON errors
         LOGGER.error("Failed to obtain plan from LLM: %s", exc)
@@ -157,10 +157,8 @@ def execute_task(plan: PlanSummary, rules: List[Rule], approved: bool) -> str:
         LOGGER.warning("Execution aborted: plan not approved")
         return "Execution aborted: plan not approved"
 
-    rule_lines = [
-        f"({r.rule_id}) {r.llm_instruction or r.description}" for r in rules]
-    system_rules = "You must comply with the following rules:\n" + \
-        "\n".join(rule_lines)
+    rule_lines = [f"({r.rule_id}) {r.llm_instruction or r.description}" for r in rules]
+    system_rules = "You must comply with the following rules:\n" + "\n".join(rule_lines)
 
     user_steps = (
         "Goal: "
