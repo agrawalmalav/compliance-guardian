@@ -132,14 +132,14 @@ def _check_text_against_rule(
     LOGGER.debug("Checking rule %s of type %s", rule.rule_id, rule.type)
 
     try:
-        if rule.type == "regex" and rule.pattern:
+        if rule.type == RuleType.REGEX and rule.pattern:
             if re.search(rule.pattern, text, flags=re.IGNORECASE):
                 reason = f"Pattern '{rule.pattern}' matched"
                 LOGGER.info("Regex violation for rule %s", rule.rule_id)
                 return _build_audit_entry(
                     rule, text, reason, rulebase_version=rulebase_version
                 )
-        elif rule.type == "semantic":
+        elif rule.type == RuleType.SEMANTIC:
             prompt = (
                 "Does the following plan violate this rule: "
                 f"{rule.description}? Explain.\n\n{text}"
@@ -151,7 +151,7 @@ def _check_text_against_rule(
                 return _build_audit_entry(
                     rule, text, response, rulebase_version=rulebase_version
                 )
-        elif rule.type == "llm" and rule.llm_instruction:
+        elif rule.type == RuleType.LLM and rule.llm_instruction:
             response = _call_llm(rule.llm_instruction + "\n\n" + text)
             if any(w in response.lower()
                    for w in ("block", "violation", "yes")):

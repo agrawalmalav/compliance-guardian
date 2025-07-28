@@ -70,7 +70,7 @@ def _check_rule(text: str, rule: Rule,
 
     LOGGER.debug("Validating rule %s", rule.rule_id)
     try:
-        if rule.type == "regex" and rule.pattern:
+        if rule.type == RuleType.REGEX and rule.pattern:
             if re.search(rule.pattern, text, flags=re.IGNORECASE):
                 reason = f"Matched pattern '{rule.pattern}'"
                 action = _severity_action(rule.severity)
@@ -90,7 +90,7 @@ def _check_rule(text: str, rule: Rule,
                     rulebase_version=rulebase_version,
                     execution_time=None,
                 )
-        elif rule.type in {"semantic", "llm"}:
+        elif rule.type in {RuleType.SEMANTIC, RuleType.LLM}:
             prompt = rule.llm_instruction or (
                 f"Does the following text violate this rule: {
                     rule.description}? Explain.\n\n{text}"

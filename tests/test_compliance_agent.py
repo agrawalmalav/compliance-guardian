@@ -16,7 +16,7 @@ class TestComplianceAgent:
         return models.Rule.model_construct(
             rule_id="R",
             description="no foo",
-            type="regex",
+            type=models.RuleType.REGEX,
             severity="high",
             domain="other",
             pattern="foo",
@@ -27,7 +27,7 @@ class TestComplianceAgent:
         return models.Rule.model_construct(
             rule_id="S",
             description="be nice",
-            type="semantic",
+            type=models.RuleType.SEMANTIC,
             severity="high",
             domain="other",
         )
