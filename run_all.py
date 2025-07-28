@@ -289,7 +289,9 @@ def test_eval_module() -> None:
         import eval as eval_module
         from pathlib import Path
 
-        sc = eval_module.load_scenarios(Path("datasets/test_scenarios.json"))
+        sc = eval_module.load_scenarios(
+            Path("compliance_guardian/datasets/test_scenarios.json")
+        )
         if not sc:
             raise AssertionError("no scenarios loaded")
         record_result(module, test, "PASS")
