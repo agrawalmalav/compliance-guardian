@@ -3,7 +3,6 @@
 from unittest.mock import patch
 
 import json
-from pathlib import Path
 
 import eval as eval_module
 from compliance_guardian.utils.models import AuditLogEntry
@@ -14,7 +13,8 @@ class TestEvaluation:
 
     def test_load_scenarios(self, tmp_path):
         path = tmp_path / "sc.json"
-        path.write_text(json.dumps([{"id": 1, "prompt": "hi"}]), encoding="utf-8")
+        path.write_text(json.dumps(
+            [{"id": 1, "prompt": "hi"}]), encoding="utf-8")
         scenarios = eval_module.load_scenarios(path)
         assert scenarios[0]["prompt"] == "hi"
 

@@ -64,7 +64,8 @@ def _call_llm(prompt: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _check_rule(text: str, rule: Rule, rulebase_version: str) -> AuditLogEntry | None:
+def _check_rule(text: str, rule: Rule,
+                rulebase_version: str) -> AuditLogEntry | None:
     """Check ``text`` against ``rule`` and return an audit entry if needed."""
 
     LOGGER.debug("Validating rule %s", rule.rule_id)
@@ -91,10 +92,12 @@ def _check_rule(text: str, rule: Rule, rulebase_version: str) -> AuditLogEntry |
                 )
         elif rule.type in {"semantic", "llm"}:
             prompt = rule.llm_instruction or (
-                f"Does the following text violate this rule: {rule.description}? Explain.\n\n{text}"
+                f"Does the following text violate this rule: {
+                    rule.description}? Explain.\n\n{text}"
             )
             response = _call_llm(prompt)
-            if any(w in response.lower() for w in ("yes", "violation", "block")):
+            if any(w in response.lower()
+                   for w in ("yes", "violation", "block")):
                 action = _severity_action(rule.severity)
                 return AuditLogEntry(
                     rule_id=rule.rule_id,

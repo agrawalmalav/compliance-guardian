@@ -14,7 +14,6 @@ from __future__ import annotations
 # used when a decision was made.
 __version__ = "0.2.1"
 
-import json
 import logging
 import os
 from typing import Dict, Iterable
@@ -68,7 +67,8 @@ def _llm_classify(prompt: str) -> str:
             res = model.generate_content(system)
             text = res.text.strip().lower()
         else:  # pragma: no cover - only hits when no API keys configured
-            LOGGER.warning("No LLM credentials available; defaulting to 'other'")
+            LOGGER.warning(
+                "No LLM credentials available; defaulting to 'other'")
             return "other"
     except Exception as exc:  # pragma: no cover - LLM failure
         LOGGER.error("LLM classification failed: %s", exc)
@@ -94,7 +94,9 @@ def classify_domain(prompt: str) -> str:
 
     lowered = prompt.lower()
     hits = {
-        name for name, words in _KEYWORDS.items() if any(w in lowered for w in words)
+        name
+        for name, words in _KEYWORDS.items()
+        if any(w in lowered for w in words)
     }
 
     if len(hits) == 1:

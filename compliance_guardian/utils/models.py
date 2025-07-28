@@ -1,15 +1,20 @@
 """Compliance Guardian typed models for GDPR, ISO, and EU regulatory workflows.
 
 This module defines Pydantic models used throughout the Compliance Guardian
-Agent to ensure structured data handling when performing compliance auditing for
-large language model (LLM) pipelines. The models cover rule definitions, audit
-logging, planning summaries, and session context tracking. These structures
-facilitate rigorous reproducibility that aligns with EU regulations.  Each
-model carries explicit version information so historical decisions can be
-recreated exactly with the same rule and agent versions.
+Agent. They ensure structured data handling when auditing large language model
+(LLM) pipelines. Models cover rule definitions, logging, planning summaries and
+session context tracking. These structures facilitate reproducibility that
+aligns with EU regulations. Each model carries explicit version information so
+historical decisions can be recreated exactly with the same rule and agent
+versions.
 
 Example:
-    >>> from compliance_guardian.utils.models import Rule, RuleType, SeverityLevel, ComplianceDomain
+    >>> from compliance_guardian.utils.models import (
+    ...     Rule,
+    ...     RuleType,
+    ...     SeverityLevel,
+    ...     ComplianceDomain,
+    ... )
     >>> rule = Rule(
     ...     rule_id="R001",
     ...     description="Redact personal data from outputs",
@@ -78,11 +83,15 @@ class Rule(BaseModel):
     rule_id: str = Field(..., description="Unique identifier for this rule.")
     version: str = Field(
         "1.0.0",
-        description="Version identifier for this rule allowing full traceability",
+        description=(
+            "Version identifier for this rule allowing full traceability"
+        ),
     )
-    description: str = Field(..., description="Human-readable rule description.")
+    description: str = Field(...,
+                             description="Human-readable rule description.")
     type: RuleType = Field(..., description="Category of the rule.")
-    severity: SeverityLevel = Field(..., description="Impact severity if violated.")
+    severity: SeverityLevel = Field(...,
+                                    description="Impact severity if violated.")
     domain: ComplianceDomain = Field(
         ..., description="Compliance domain to which this rule belongs."
     )
@@ -159,16 +168,28 @@ class AuditLogEntry(BaseModel):
         default_factory=datetime.utcnow, description="When the event occurred."
     )
     rule_id: str = Field(..., description="Identifier of the triggered rule.")
-    severity: SeverityLevel = Field(..., description="Severity level of the event.")
-    action: str = Field(..., description="Description of the action taken.")
-    input_text: str = Field(..., description="Input text that led to the event.")
-    justification: str = Field(..., description="Explanation for the chosen action.")
+    severity: SeverityLevel = Field(
+        ..., description="Severity level of the event."
+    )
+    action: str = Field(
+        ..., description="Description of the action taken."
+    )
+    input_text: str = Field(
+        ..., description="Input text that led to the event."
+    )
+    justification: str = Field(
+        ..., description="Explanation for the chosen action."
+    )
     suggested_fix: Optional[str] = Field(
         None, description="Proposed fix for the violation."
     )
-    clause_id: Optional[str] = Field(None, description="Clause identifier referenced.")
-    risk_score: Optional[float] = Field(None, description="Numerical risk score.")
-    session_id: str = Field(..., description="Identifier for the associated session.")
+    clause_id: Optional[str] = Field(
+        None, description="Clause identifier referenced.")
+    risk_score: Optional[float] = Field(
+        None, description="Numerical risk score.")
+    session_id: str = Field(
+        ..., description="Identifier for the associated session."
+    )
     agent_stack: List[str] = Field(
         default_factory=list, description="List of agents involved."
     )
@@ -211,7 +232,8 @@ class AuditLogEntry(BaseModel):
         try:
             return self.dict()
         except Exception as exc:  # pragma: no cover - extremely unlikely
-            raise ValueError(f"Unable to serialize AuditLogEntry: {exc}") from exc
+            raise ValueError(
+                f"Unable to serialize AuditLogEntry: {exc}") from exc
 
 
 class PlanSummary(BaseModel):
@@ -227,7 +249,9 @@ class PlanSummary(BaseModel):
 
     action_plan: str = Field(..., description="High-level plan of action.")
     goal: str = Field(..., description="Compliance or user goal.")
-    domain: ComplianceDomain = Field(..., description="Compliance domain for the plan.")
+    domain: ComplianceDomain = Field(
+        ..., description="Compliance domain for the plan."
+    )
     sub_actions: List[str] = Field(
         default_factory=list, description="Sub-actions to perform."
     )
@@ -248,7 +272,8 @@ class PlanSummary(BaseModel):
         try:
             return self.dict()
         except Exception as exc:  # pragma: no cover - extremely unlikely
-            raise ValueError(f"Unable to serialize PlanSummary: {exc}") from exc
+            raise ValueError(
+                f"Unable to serialize PlanSummary: {exc}") from exc
 
 
 class SessionContext(BaseModel):
@@ -264,7 +289,8 @@ class SessionContext(BaseModel):
         intermediate_outputs: Outputs produced mid-execution.
     """
 
-    session_id: str = Field(..., description="Unique identifier for the session.")
+    session_id: str = Field(...,
+                            description="Unique identifier for the session.")
     domain: ComplianceDomain = Field(
         ..., description="Compliance domain governing the session."
     )
@@ -274,9 +300,12 @@ class SessionContext(BaseModel):
     active_rules: List[str] = Field(
         default_factory=list, description="List of active rule identifiers."
     )
-    risk_threshold: float = Field(..., description="Threshold for acceptable risk.")
+    risk_threshold: float = Field(
+        ..., description="Threshold for acceptable risk."
+    )
     agent_versions: Dict[str, str] = Field(
-        default_factory=dict, description="Versions of agents used during the session."
+        default_factory=dict,
+        description="Versions of agents used during the session.",
     )
     intermediate_outputs: Dict[str, Any] = Field(
         default_factory=dict, description="Outputs produced mid-execution."
@@ -295,4 +324,5 @@ class SessionContext(BaseModel):
         try:
             return self.dict()
         except Exception as exc:  # pragma: no cover - extremely unlikely
-            raise ValueError(f"Unable to serialize SessionContext: {exc}") from exc
+            raise ValueError(
+                f"Unable to serialize SessionContext: {exc}") from exc

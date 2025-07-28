@@ -51,7 +51,10 @@ def score_risk(
     if matrix and domain in matrix and rule.rule_id in matrix[domain]:
         score = matrix[domain][rule.rule_id]
         LOGGER.info(
-            "Risk override: domain=%s rule=%s score=%s", domain, rule.rule_id, score
+            "Risk override: domain=%s rule=%s score=%s",
+            domain,
+            rule.rule_id,
+            score,
         )
         return score
 

@@ -20,7 +20,7 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     genai = None  # type: ignore
 
-from .models import ComplianceDomain, Rule
+from .models import Rule
 
 LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -92,7 +92,8 @@ def convert_clause_to_rule(text: str) -> Rule:
     rule = Rule.from_dict(data)
     domain = rule.domain if isinstance(rule.domain, str) else rule.domain.value
     rules_path = (
-        Path(__file__).resolve().parents[1] / "config" / "rules" / f"{domain}.json"
+        Path(__file__).resolve().parents[1] /
+        "config" / "rules" / f"{domain}.json"
     )
     rules_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -111,7 +112,9 @@ def convert_clause_to_rule(text: str) -> Rule:
     except Exception as exc:  # pragma: no cover - filesystem errors
         LOGGER.exception("Failed writing rule file %s: %s", rules_path, exc)
 
-    prov_log = Path(__file__).resolve().parents[1] / "logs" / "legal_conversion.log"
+    prov_log = (
+        Path(__file__).resolve().parents[1] / "logs" / "legal_conversion.log"
+    )
     prov_log.parent.mkdir(parents=True, exist_ok=True)
     provenance = {
         "timestamp": datetime.utcnow().isoformat(),

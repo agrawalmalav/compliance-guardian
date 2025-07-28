@@ -57,9 +57,11 @@ def evaluate(seed: int = 42) -> Tuple[float, float, float]:
 
     precision = tp / (tp + fp) if tp + fp else 0.0
     recall = tp / (tp + fn) if tp + fn else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    f1 = 2 * precision * recall / \
+        (precision + recall) if precision + recall else 0.0
 
-    coverage = sum(1 for e in all_entries if e.justification) / len(all_entries or [1])
+    coverage = sum(1 for e in all_entries if e.justification) / \
+        len(all_entries or [1])
 
     md_lines = [
         "# Evaluation Results",
@@ -81,10 +83,13 @@ def evaluate(seed: int = 42) -> Tuple[float, float, float]:
         "\\hline",
     ]
     for idx, (exp, got) in enumerate(results, start=1):
-        tex_lines.append(f'{idx} & {exp} & {got} ")')
+        tex_lines.append(f"{idx} & {exp} & {got} \")")
     tex_lines.append("\\hline")
     tex_lines.append(
-        f'\\multicolumn{{3}}{{c}}{{Precision {precision:.2f}, Recall {recall:.2f}, F1 {f1:.2f}}} ")'
+        (
+            f"\\multicolumn{{3}}{{c}}{{Precision {precision:.2f}, "
+            f"Recall {recall:.2f}, F1 {f1:.2f}}} \")"
+        )
     )
     tex_lines.append("\\end{tabular}")
 

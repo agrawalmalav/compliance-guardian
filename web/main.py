@@ -44,7 +44,8 @@ app.mount(
 )
 app.mount(
     "/static/reports",
-    StaticFiles(directory=log_writer._REPORT_DIR),  # type: ignore[attr-defined]
+    # type: ignore[attr-defined]
+    StaticFiles(directory=log_writer._REPORT_DIR),
     name="reports-static",
 )
 
@@ -81,21 +82,25 @@ def _run_pipeline(prompt: str) -> PipelineResult:
         domain = domain_classifier.classify_domain(prompt)
     except Exception as exc:  # pragma: no cover - unexpected failure
         LOGGER.exception("Domain classification failed: %s", exc)
-        raise HTTPException(status_code=500, detail="Domain classification failed")
+        raise HTTPException(
+            status_code=500, detail="Domain classification failed")
 
     try:
         rules = _SELECTOR.load(domain)
         rulebase_ver = _SELECTOR.get_version(domain)
     except Exception as exc:
         LOGGER.exception("Rule loading failed: %s", exc)
-        raise HTTPException(status_code=500, detail="Could not load compliance rules")
+        raise HTTPException(
+            status_code=500, detail="Could not load compliance rules")
 
     plan = primary_agent.generate_plan(prompt, domain)
 
-    plan_allowed, plan_entry = compliance_agent.check_plan(plan, rules, rulebase_ver)
+    plan_allowed, plan_entry = compliance_agent.check_plan(
+        plan, rules, rulebase_ver)
 
     if plan_allowed:
-        execution_output = primary_agent.execute_task(plan, rules, approved=True)
+        execution_output = primary_agent.execute_task(
+            plan, rules, approved=True)
         output_allowed, output_entries = compliance_agent.post_output_check(
             execution_output, rules, rulebase_ver
         )
@@ -151,10 +156,13 @@ def _render_result_html(result: PipelineResult) -> str:
         else "<p>No plan violations detected.</p>"
     )
     output_entries = "".join(
-        f"<pre>{e.model_dump_json(indent=2)}</pre>" for e in result.output_violations
+        f"<pre>{e.model_dump_json(indent=2)}</pre>"
+        for e in result.output_violations
     )
     report_link = (
-        f"<a href='/static/reports/{result.report_file}'>{result.report_file}</a>"
+        f"<a href='/static/reports/{
+            result.report_file}'>{
+            result.report_file}</a>"
         if result.report_file
         else "No report generated"
     )
@@ -162,7 +170,8 @@ def _render_result_html(result: PipelineResult) -> str:
     if result.plan_violation:
         explanation += result.plan_violation.justification or ""
     if result.output_violations:
-        explanation += " " + " ".join(e.justification or "" for e in result.output_violations)
+        explanation += " " + \
+            " ".join(e.justification or "" for e in result.output_violations)
     explanation = explanation.strip()
     html = f"""
     <html>
@@ -186,11 +195,14 @@ def _render_result_html(result: PipelineResult) -> str:
         <p>{report_link}</p>
         <h2>User Feedback</h2>
         <form action='/feedback' method='post'>
-          <input type='hidden' name='scenario_id' value='{result.report_file or "web"}'>
+          <input type='hidden' name='scenario_id'
+                 value='{result.report_file or "web"}'>
           <input type='hidden' name='prompt' value='{result.prompt}'>
           <input type='hidden' name='action' value='{result.final_action}'>
           <input type='hidden' name='explanation' value='{explanation}'>
-          <label>Rating (1-5): <input type='number' name='rating' min='1' max='5'></label><br>
+          <label>Rating (1-5):
+            <input type='number' name='rating' min='1' max='5'>
+          </label><br>
           <label>Comment: <input type='text' name='comment'></label><br>
           <input type='submit' value='Submit Feedback'>
         </form>
@@ -263,7 +275,8 @@ async def feedback(
         LOGGER.exception("Feedback recording failed: %s", exc)
         message = "Failed to record feedback"
 
-    return HTMLResponse(f"<html><body><p>{message}</p><a href='/'>Back</a></body></html>")
+    return HTMLResponse(
+        f"<html><body><p>{message}</p><a href='/'>Back</a></body></html>")
 
 
 @app.get("/logs", response_class=HTMLResponse)
@@ -273,7 +286,8 @@ async def list_logs() -> str:
     log_dir = Path(log_writer._LOG_DIR)  # type: ignore[attr-defined]
     files = sorted(p.name for p in log_dir.glob("*.jsonl"))
     links = "".join(
-        f"<li><a href='/static/logs/{name}'>{name}</a></li>" for name in files
+        f"<li><a href='/static/logs/{name}'>{name}</a></li>"
+        for name in files
     ) or "<li>No logs available</li>"
     return f"<html><body><h1>Audit Logs</h1><ul>{links}</ul></body></html>"
 
@@ -285,7 +299,8 @@ async def list_reports() -> str:
     rep_dir = Path(log_writer._REPORT_DIR)  # type: ignore[attr-defined]
     files = sorted(p.name for p in rep_dir.glob("*.md"))
     links = "".join(
-        f"<li><a href='/static/reports/{name}'>{name}</a></li>" for name in files
+        f"<li><a href='/static/reports/{name}'>{name}</a></li>"
+        for name in files
     ) or "<li>No reports available</li>"
     return f"<html><body><h1>Reports</h1><ul>{links}</ul></body></html>"
 
