@@ -16,7 +16,7 @@ class TestOutputValidator:
         return models.Rule.model_construct(
             rule_id="R",
             description="secret",
-            type="regex",
+            type=models.RuleType.REGEX,
             severity="high",
             domain="other",
             pattern="secret",
@@ -27,7 +27,7 @@ class TestOutputValidator:
         return models.Rule.model_construct(
             rule_id="L",
             description="avoid bad",
-            type="semantic",
+            type=models.RuleType.SEMANTIC,
             severity="high",
             domain="other",
         )

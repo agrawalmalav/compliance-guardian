@@ -16,7 +16,7 @@ class TestPrimaryAgent:
         return models.Rule.model_construct(
             rule_id="R1",
             description="desc",
-            type="regex",
+            type=models.RuleType.REGEX,
             severity="low",
             domain="other",
             pattern="foo",

@@ -32,12 +32,15 @@ from pydantic import BaseModel, Field, ValidationError
 
 
 class RuleType(str, Enum):
-    """Enumeration of rule categories."""
+    """Enumeration of rule categories and matching methods."""
 
     CONTENT = "content"
     SECURITY = "security"
     PRIVACY = "privacy"
     PROCEDURAL = "procedural"
+    REGEX = "regex"
+    SEMANTIC = "semantic"
+    LLM = "llm"
 
 
 class SeverityLevel(str, Enum):
@@ -121,6 +124,12 @@ class Rule(BaseModel):
         """
 
         try:
+            if isinstance(data.get("type"), str):
+                try:
+                    data["type"] = RuleType(data["type"])
+                except ValueError:
+                    # allow using enum member names as strings
+                    data["type"] = RuleType[data["type"].upper()]
             return cls(**data)
         except ValidationError as exc:
             raise ValueError(f"Invalid Rule data: {exc}") from exc
