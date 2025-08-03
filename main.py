@@ -18,9 +18,9 @@ import typer
 
 from compliance_guardian.agents import (
     compliance_agent,
-    domain_classifier,
     primary_agent,
     rule_selector,
+    joint_extractor,
 )
 from compliance_guardian.utils.log_writer import (
     log_decision,
@@ -71,7 +71,11 @@ def _prompt_yes(question: str) -> bool:
 
 
 def run_pipeline(
-    prompt: str, session_id: str, *, interactive: bool = True
+    prompt: str,
+    session_id: str,
+    *,
+    interactive: bool = True,
+    llm: Optional[str] = None,
 ) -> Tuple[str, str, List[AuditLogEntry]]:
     """Run the end-to-end compliance pipeline for ``prompt``.
 
@@ -93,38 +97,36 @@ def run_pipeline(
 
     entries: List[AuditLogEntry] = []
 
-    # --- Domain classification ---
+    # --- Joint extraction ---
     start = time.time()
-    domain = domain_classifier.classify_domain(prompt)
+    domains, user_rules = joint_extractor.extract(prompt, llm=llm)
     duration = time.time() - start
-    LOGGER.info("Domain classified as %s in %.2fs", domain, duration)
+    LOGGER.info("Joint extractor found domains %s in %.2fs", domains, duration)
     entries.append(
         AuditLogEntry(
             rule_id="DOMAIN",
             severity="low",
             action="LOG",
             input_text=prompt,
-            justification=f"classified as {domain}",
+            justification=f"classified as {domains}",
             session_id=session_id,
-            agent_stack=["domain_classifier"],
+            agent_stack=["joint_extractor"],
             rule_version=None,
-            agent_versions={
-                "domain_classifier": domain_classifier.__version__
-            },
+            agent_versions={"joint_extractor": joint_extractor.__version__},
             rulebase_version=None,
             execution_time=duration,
         )
     )
 
-    # --- Rule loading ---
+    # --- Rule aggregation ---
     selector = rule_selector.RuleSelector()
-    rules = selector.load(domain)
-    rulebase_ver = selector.get_version(domain)
-    LOGGER.info("Loaded %d rules for domain %s", len(rules), domain)
+    rules, rulebase_ver = selector.aggregate(domains, user_rules)
+    LOGGER.info("Loaded %d total rules", len(rules))
 
     # --- Plan generation ---
     start = time.time()
-    plan = primary_agent.generate_plan(prompt, domain)
+    injections = [r.llm_instruction for r in rules if r.llm_instruction]
+    plan = primary_agent.generate_plan(prompt, domains, injections, llm=llm)
     duration = time.time() - start
     LOGGER.info("Generated plan in %.2fs", duration)
     entries.append(
@@ -144,37 +146,38 @@ def run_pipeline(
     )
 
     # --- Pre-execution compliance check ---
-    allowed, violation = compliance_agent.check_plan(plan, rules, rulebase_ver)
-    if violation:
-        log_decision(violation)
-        entries.append(violation)
-        LOGGER.warning(
-            "Plan violation %s with action %s",
-            violation.rule_id,
-            violation.action,
+    allowed, plan_entries = compliance_agent.check_plan(
+        plan, rules, rulebase_ver, llm=llm
+    )
+    for entry in plan_entries:
+        log_decision(entry)
+    entries.extend(plan_entries)
+    block_entries = [e for e in plan_entries if e.action == "BLOCK"]
+    warn_entries = [e for e in plan_entries if e.action == "WARN"]
+    if block_entries:
+        first = block_entries[0]
+        LOGGER.warning("Plan violation %s with action BLOCK", first.rule_id)
+        if interactive and _prompt_yes("Plan blocked. Generate new plan?"):
+            return run_pipeline(
+                prompt, session_id, interactive=interactive, llm=llm
+            )
+        return "", "block", entries
+    if warn_entries:
+        summary = ", ".join(
+            f"{w.rule_index}:{w.justification}" for w in warn_entries
         )
-        if violation.action == "BLOCK":
-            if interactive and _prompt_yes("Plan blocked. Generate new plan?"):
-                return run_pipeline(
-                    prompt,
-                    session_id,
-                    interactive=interactive,
-                )
-            LOGGER.info("Aborting due to BLOCK action")
-            return "", "block", entries
-        if violation.action == "WARN":
-            proceed = True
-            if interactive:
-                proceed = _prompt_yes("Warning issued. Continue?")
-            if not proceed:
-                LOGGER.info("User aborted after warning")
-                return "", "warn", entries
+        LOGGER.warning("Warnings: %s", summary)
+        proceed = True
+        if interactive:
+            proceed = _prompt_yes("Warnings detected. Continue?")
+        if not proceed:
+            return "", "warn", entries
     else:
         LOGGER.info("Plan approved for execution")
 
     # --- Execution ---
     start = time.time()
-    output = primary_agent.execute_task(plan, rules, approved=True)
+    output = primary_agent.execute_task(plan, rules, approved=True, llm=llm)
     exec_duration = time.time() - start
     LOGGER.info("Executed plan in %.2fs", exec_duration)
 
@@ -183,6 +186,7 @@ def run_pipeline(
         output,
         rules,
         rulebase_ver,
+        llm=llm,
     )
     for entry in out_entries:
         log_decision(entry)
@@ -224,6 +228,11 @@ def run(
         "--session-id",
         help="Session id",
     ),
+    llm: Optional[str] = typer.Option(
+        None,
+        "--llm",
+        help="LLM provider to use (e.g. 'openai' or 'gemini')",
+    ),
 ) -> None:
     """Process one or more prompts through the compliance pipeline."""
 
@@ -238,7 +247,7 @@ def run(
     for idx, prmpt in enumerate(prompts, start=1):
         typer.echo(f"\n### Processing prompt {idx}")
         try:
-            output, action, _ = run_pipeline(prmpt, session_id)
+            output, action, _ = run_pipeline(prmpt, session_id, llm=llm)
         except Exception as exc:  # pragma: no cover
             LOGGER.exception("Pipeline failed: %s", exc)
             continue

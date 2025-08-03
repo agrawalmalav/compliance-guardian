@@ -123,15 +123,20 @@ def log_session_report(entries: List[AuditLogEntry], file_path: str) -> None:
             path = _REPORT_DIR / path
         path.parent.mkdir(parents=True, exist_ok=True)
 
+
         summary = [
             {
                 "rule_id": e.rule_id,
+                "rule_index": e.rule_index,
+                "category": e.category,
+                "source": e.source,
                 "rule_version": e.rule_version,
                 "agent_versions": e.agent_versions,
                 "rulebase_version": e.rulebase_version,
                 "clause": e.clause_id,
                 "action": e.action,
                 "risk_score": e.risk_score,
+                "legal_reference": e.legal_reference,
             }
             for e in entries
         ]
@@ -142,9 +147,8 @@ def log_session_report(entries: List[AuditLogEntry], file_path: str) -> None:
         )
 
         table_lines = [
-            "| rule_id | r_ver | agents | rulebase | clause | action |"
-            " risk_score |",
-            "| --- | --- | --- | --- | --- | --- | --- |",
+            "| rule_id | index | category | source | r_ver | agents | rulebase | clause | action | risk_score | legal_reference |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         ]
         for s in summary:
             agents_field = s.get("agent_versions")
@@ -153,18 +157,22 @@ def log_session_report(entries: List[AuditLogEntry], file_path: str) -> None:
             else:
                 agents = ""
             table_lines.append(
-                "| {rule_id} | {rver} | {agents} | {rbase} | {clause} | "
-                "{action} | {risk}|".format(
+                "| {rule_id} | {index} | {cat} | {src} | {rver} | {agents} | {rbase} | {clause} | {action} | {risk} | {legal} |".format(
                     rule_id=s["rule_id"],
+                    index=s.get("rule_index") or "",
+                    cat=s.get("category") or "",
+                    src=s.get("source") or "",
                     rver=s.get("rule_version") or "",
                     agents=agents,
                     rbase=s.get("rulebase_version") or "",
                     clause=s.get("clause") or "",
                     action=s["action"],
                     risk=s.get("risk_score") or "",
+                    legal=s.get("legal_reference") or "",
                 )
             )
         table = "\n".join(table_lines)
+
 
         content = (
             "# ISO/EU Governance Mapping\n\nGenerated: "

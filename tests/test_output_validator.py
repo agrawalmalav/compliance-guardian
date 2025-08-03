@@ -20,6 +20,7 @@ class TestOutputValidator:
             severity="high",
             domain="other",
             pattern="secret",
+            action="BLOCK",
         )
 
     @pytest.fixture()
@@ -30,6 +31,7 @@ class TestOutputValidator:
             type=models.RuleType.SEMANTIC,
             severity="high",
             domain="other",
+            action="BLOCK",
         )
 
     def test_regex_rule_detection(self, regex_rule):

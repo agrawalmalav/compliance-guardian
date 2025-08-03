@@ -25,7 +25,7 @@ __version__ = "0.2.1"
 import json
 import logging
 import os
-from typing import List, Sequence, Dict
+from typing import List, Sequence, Dict, Optional
 
 try:
     import openai  # type: ignore
@@ -63,9 +63,9 @@ def _coerce_domain(domain: str) -> ComplianceDomain:
 # ---------------------------------------------------------------------------
 
 
-def _call_llm(messages: Sequence[Dict[str, str]]) -> str:
+def _call_llm(messages: Sequence[Dict[str, str]], llm: Optional[str]) -> str:
     """Internal helper to call either OpenAI or Gemini models."""
-    if openai and os.getenv("OPENAI_API_KEY"):
+    if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
         client = openai.OpenAI()
         resp = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -73,7 +73,7 @@ def _call_llm(messages: Sequence[Dict[str, str]]) -> str:
         )
         content = resp.choices[0].message.content or ""
         return content.strip()
-    if genai and os.getenv("GEMINI_API_KEY"):
+    if (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         model = genai.GenerativeModel("gemini-pro")
         res = model.generate_content("\n".join(m["content"] for m in messages))
@@ -85,8 +85,10 @@ def _call_llm(messages: Sequence[Dict[str, str]]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def generate_plan(prompt: str, domain: str) -> PlanSummary:
-    """Generate an execution plan from ``prompt`` for a given ``domain``.
+def generate_plan(
+    prompt: str, domains: List[str], constraints: List[str], llm: Optional[str] = None
+) -> PlanSummary:
+    """Generate an execution plan from ``prompt`` given ``domains``.
 
     The function sends the user prompt to an LLM with instructions to
     provide a JSON payload containing a ``goal`` string and a list of
@@ -101,16 +103,18 @@ def generate_plan(prompt: str, domain: str) -> PlanSummary:
         Parsed :class:`PlanSummary` describing the strategy.
     """
 
-    LOGGER.info("Generating plan for domain '%s' with prompt: %s", domain, prompt)
+    domain = domains[0] if domains else "other"
+    LOGGER.info("Generating plan for domains %s with prompt: %s", domains, prompt)
+    constraint_text = "\n".join(constraints)
     plan_system = (
-        "You are a task planner for an AI assistant. "
-        "Given the prompt: {prompt}, decompose into step-by-step actions "
-        "and the main goal. Respond in JSON with keys 'goal' and 'steps'."
-    ).format(prompt=prompt)
+        "You are a task planner for an AI assistant. Given the prompt: {prompt}, "
+        "decompose into step-by-step actions and the main goal. Respond in JSON "
+        "with keys 'goal' and 'steps'.\nCompliance constraints:\n{constraints}"
+    ).format(prompt=prompt, constraints=constraint_text)
 
     messages = [{"role": "system", "content": plan_system}]
     try:
-        reply = _call_llm(messages)
+        reply = _call_llm(messages, llm)
         parsed = json.loads(reply)
         goal = parsed.get("goal", prompt)
         steps = parsed.get("steps", [])
@@ -136,7 +140,12 @@ def generate_plan(prompt: str, domain: str) -> PlanSummary:
 # ---------------------------------------------------------------------------
 
 
-def execute_task(plan: PlanSummary, rules: List[Rule], approved: bool) -> str:
+def execute_task(
+    plan: PlanSummary,
+    rules: List[Rule],
+    approved: bool,
+    llm: Optional[str] = None,
+) -> str:
     """Execute ``plan`` under ``rules`` if ``approved``.
 
     The rules are injected as part of the system prompt so the LLM
@@ -173,7 +182,7 @@ def execute_task(plan: PlanSummary, rules: List[Rule], approved: bool) -> str:
 
     LOGGER.info("Executing plan with %d rule constraints", len(rules))
     try:
-        output = _call_llm(messages)
+        output = _call_llm(messages, llm)
     except Exception as exc:  # pragma: no cover - network errors
         LOGGER.error("LLM execution failed: %s", exc)
         output = "Execution failed due to LLM error"

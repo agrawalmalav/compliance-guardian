@@ -44,11 +44,11 @@ logging.basicConfig(level=logging.INFO)
 # ---------------------------------------------------------------------------
 
 
-def _call_llm(prompt: str) -> str:
+def _call_llm(prompt: str, llm: Optional[str]) -> str:
     """Invoke the configured LLM with ``prompt`` and return the response."""
 
     LOGGER.debug("LLM prompt: %s", prompt)
-    if openai and os.getenv("OPENAI_API_KEY"):
+    if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
         client = openai.OpenAI()
         resp = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -57,7 +57,7 @@ def _call_llm(prompt: str) -> str:
         )
         content = resp.choices[0].message.content or ""
         return content.strip()
-    if genai and os.getenv("GEMINI_API_KEY"):
+    if (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         model = genai.GenerativeModel("gemini-pro")
         res = model.generate_content(prompt)
@@ -69,14 +69,14 @@ def _call_llm(prompt: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _action_for_severity(sev: SeverityLevel) -> str:
-    """Map ``SeverityLevel`` to an action label used in logs."""
+def _risk_from_severity(sev: SeverityLevel) -> float:
+    """Return a numeric risk score for ``sev``."""
 
-    if sev == SeverityLevel.HIGH or sev == SeverityLevel.CRITICAL:
-        return "BLOCK"
+    if sev in (SeverityLevel.HIGH, SeverityLevel.CRITICAL):
+        return 0.9
     if sev == SeverityLevel.MEDIUM:
-        return "WARN"
-    return "LOG"
+        return 0.6
+    return 0.1
 
 
 # ---------------------------------------------------------------------------
@@ -91,12 +91,8 @@ def _build_audit_entry(
 ) -> AuditLogEntry:
     """Create an :class:`AuditLogEntry` for a rule violation."""
 
-    action = _action_for_severity(rule.severity)
-    suggested = (
-        "Review the content for compliance."
-        if rule.severity != SeverityLevel.LOW
-        else None
-    )
+    action = rule.action
+    suggested = rule.suggestion
     return AuditLogEntry(
         rule_id=rule.rule_id,
         severity=rule.severity,
@@ -104,14 +100,18 @@ def _build_audit_entry(
         input_text=text,
         justification=reason,
         suggested_fix=suggested,
-        clause_id=next(iter(rule.clause_mapping.keys()), None),
-        risk_score=None,
+        clause_id=None,
+        risk_score=_risk_from_severity(rule.severity),
         session_id=session_id,
         agent_stack=[__name__],
         rule_version=rule.version,
         agent_versions={__name__: __version__},
         rulebase_version=rulebase_version,
         execution_time=None,
+        rule_index=rule.index,
+        category=rule.category,
+        source=rule.source,
+        legal_reference=rule.legal_reference,
     )
 
 
@@ -119,7 +119,7 @@ def _build_audit_entry(
 
 
 def _check_text_against_rule(
-    text: str, rule: Rule, rulebase_version: str
+    text: str, rule: Rule, rulebase_version: str, llm: Optional[str]
 ) -> Optional[AuditLogEntry]:
     """Check ``text`` against a single compliance ``rule``.
 
@@ -146,14 +146,14 @@ def _check_text_against_rule(
                 "Does the following plan violate this rule: "
                 f"{rule.description}? Explain.\n\n{text}"
             )
-            response = _call_llm(prompt)
+            response = _call_llm(prompt, llm)
             if any(w in response.lower() for w in ("yes", "violation", "block")):
                 LOGGER.info("Semantic violation for rule %s", rule.rule_id)
                 return _build_audit_entry(
                     rule, text, response, rulebase_version=rulebase_version
                 )
         elif rule.type == RuleType.LLM and rule.llm_instruction:
-            response = _call_llm(rule.llm_instruction + "\n\n" + text)
+            response = _call_llm(rule.llm_instruction + "\n\n" + text, llm)
             if any(w in response.lower() for w in ("block", "violation", "yes")):
                 LOGGER.info("LLM violation for rule %s", rule.rule_id)
                 return _build_audit_entry(
@@ -174,42 +174,44 @@ def _check_text_against_rule(
 
 
 def check_plan(
-    plan: PlanSummary, rules: List[Rule], rulebase_version: str
-) -> Tuple[bool, Optional[AuditLogEntry]]:
+    plan: PlanSummary,
+    rules: List[Rule],
+    rulebase_version: str,
+    llm: Optional[str] = None,
+) -> Tuple[bool, List[AuditLogEntry]]:
     """Validate a :class:`PlanSummary` against compliance ``rules``.
 
-    Iterates over each rule and returns as soon as a violation is
-    encountered. High severity violations result in a ``BLOCK`` action,
-    medium severity leads to ``WARN`` and low severity simply logs the
-    issue. The boolean return value indicates whether execution may
-    continue.
-
-    Args:
-        plan: The plan to validate.
-        rules: List of rules relevant to the plan's domain.
-
-    Returns:
-        Tuple ``(allowed, audit_entry)`` where ``allowed`` is ``True`` if no
-        blocking violation occurred and ``audit_entry`` details the first
-        violation encountered if any.
+    Iterates over each rule and aggregates all violations. ``BLOCK``
+    actions cause the overall ``allowed`` flag to be ``False`` while
+    ``WARN`` actions are returned for user confirmation.
     """
 
     LOGGER.info("Checking plan with %d rules", len(rules))
+    entries: List[AuditLogEntry] = []
+    allowed = True
     for rule in rules:
-        entry = _check_text_against_rule(plan.action_plan, rule, rulebase_version)
+        entry = _check_text_against_rule(
+            plan.action_plan, rule, rulebase_version, llm
+        )
         if entry:
-            allowed = entry.action != "BLOCK"
-            LOGGER.debug("Rule %s triggered with action %s", rule.rule_id, entry.action)
-            return allowed, entry
-    LOGGER.info("Plan passed all compliance checks")
-    return True, None
+            entries.append(entry)
+            if entry.action == "BLOCK":
+                allowed = False
+    if entries:
+        LOGGER.debug("Plan triggered %d rule checks", len(entries))
+    else:
+        LOGGER.info("Plan passed all compliance checks")
+    return allowed, entries
 
 
 # ---------------------------------------------------------------------------
 
 
 def post_output_check(
-    output: str, rules: List[Rule], rulebase_version: str
+    output: str,
+    rules: List[Rule],
+    rulebase_version: str,
+    llm: Optional[str] = None,
 ) -> Tuple[bool, List[AuditLogEntry]]:
     """Validate final ``output`` text against ``rules``.
 
@@ -230,7 +232,7 @@ def post_output_check(
     entries: List[AuditLogEntry] = []
     allowed = True
     for rule in rules:
-        entry = _check_text_against_rule(output, rule, rulebase_version)
+        entry = _check_text_against_rule(output, rule, rulebase_version, llm)
         if entry:
             entries.append(entry)
             if entry.action == "BLOCK":
