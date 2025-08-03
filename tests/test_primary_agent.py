@@ -31,6 +31,13 @@ class TestPrimaryAgent:
             assert plan.goal == "g"
             assert plan.sub_actions == ["a", "b"]
 
+    def test_generate_plan_code_fence(self):
+        fenced = "```json\n{\"goal\": \"g\", \"steps\": [\"a\"]}\n```"
+        with patch.object(primary_agent, "_call_llm", return_value=fenced):
+            plan = primary_agent.generate_plan("prompt", ["other"], [])
+            assert plan.goal == "g"
+            assert plan.sub_actions == ["a"]
+
     def test_generate_plan_fallback_on_error(self):
         with patch.object(
             primary_agent, "_call_llm", side_effect=ValueError("fail")
