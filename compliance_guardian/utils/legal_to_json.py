@@ -40,7 +40,7 @@ def _call_llm(prompt: str) -> str:
         return content.strip()
     if genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        model = genai.GenerativeModel("gemini-pro")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         res = model.generate_content(prompt)
         return res.text.strip()
     raise RuntimeError("No LLM credentials configured")
@@ -121,7 +121,7 @@ def convert_clause_to_rule(text: str) -> Rule:
         "input_text": text,
         "rule_id": rule.rule_id,
         "domain": domain,
-        "llm_model": os.getenv("OPENAI_MODEL", "gemini-pro"),
+        "llm_model": "gemini-2.5-flash",
     }
     with prov_log.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(provenance) + "\n")

@@ -63,7 +63,7 @@ def _llm_classify(prompt: str) -> str:
             text = raw.strip().lower()
         elif genai and os.getenv("GEMINI_API_KEY"):
             genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-            model = genai.GenerativeModel("gemini-pro")
+            model = genai.GenerativeModel("gemini-2.5-flash")
             res = model.generate_content(system)
             text = res.text.strip().lower()
         else:  # pragma: no cover - only hits when no API keys configured
