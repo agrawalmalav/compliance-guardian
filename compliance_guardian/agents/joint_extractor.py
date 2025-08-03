@@ -76,7 +76,7 @@ def _llm_extract(prompt: str, llm: Optional[str]) -> Tuple[List[str], List[Rule]
             raw = resp.choices[0].message.content or "{}"
         elif (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
             genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-            model = genai.GenerativeModel("gemini-pro")
+            model = genai.GenerativeModel("gemini-2.5-flash")
             res = model.generate_content(system)
             raw = res.text
         else:

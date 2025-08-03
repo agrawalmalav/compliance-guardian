@@ -75,7 +75,7 @@ def _call_llm(messages: Sequence[Dict[str, str]], llm: Optional[str]) -> str:
         return content.strip()
     if (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        model = genai.GenerativeModel("gemini-pro")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         res = model.generate_content("\n".join(m["content"] for m in messages))
         return res.text.strip()
     LOGGER.warning("No LLM credentials configured; falling back to demo plan")
