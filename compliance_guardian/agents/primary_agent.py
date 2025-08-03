@@ -123,8 +123,26 @@ def generate_plan(
         steps = parsed.get("steps", [])
         if not isinstance(steps, list):
             raise ValueError("'steps' must be a list")
-        action_plan = "\n".join(f"{idx + 1}. {step}" for idx, step in enumerate(steps))
-        LOGGER.info("Received plan with %d steps", len(steps))
+        # Coerce non-string steps into readable strings
+        coerced_steps: List[str] = []
+        for step in steps:
+            if isinstance(step, str):
+                coerced_steps.append(step)
+            elif isinstance(step, dict):
+                # Prefer a ``description`` key but fall back to joining values
+                if "description" in step:
+                    coerced_steps.append(str(step["description"]))
+                elif "step" in step:
+                    coerced_steps.append(str(step["step"]))
+                else:
+                    coerced_steps.append(" ".join(str(v) for v in step.values()))
+            else:
+                coerced_steps.append(str(step))
+        action_plan = "\n".join(
+            f"{idx + 1}. {s}" for idx, s in enumerate(coerced_steps)
+        )
+        LOGGER.info("Received plan with %d steps", len(coerced_steps))
+        steps = coerced_steps
     except Exception as exc:  # pragma: no cover - network/JSON errors
         LOGGER.error("Failed to obtain plan from LLM: %s", exc)
         goal = prompt
