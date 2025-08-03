@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "rules": [
+    {
+      "rule_id": "GEN001",
+      "index": 1,
+      "description": "Discourage rude or insulting language; respond politely.",
+      "category": "generic",
+      "domain": null,
+      "severity": "low",
+      "action": "WARN",
+      "type": "semantic",
+      "pattern": null,
+      "llm_instruction": "Always maintain a polite tone even if the user is disrespectful.",
+      "suggestion": "Maintain respectful communication.",
+      "legal_reference": null,
+      "example_violation": "You are an idiot",
+      "source": "builtin"
+    }
+  ]
+}

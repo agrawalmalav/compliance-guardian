@@ -63,6 +63,16 @@ def _call_llm(prompt: str) -> str:
     raise RuntimeError("No LLM credentials configured")
 
 
+def _risk_from_severity(sev: SeverityLevel) -> float:
+    """Return a numeric risk score for ``sev``."""
+
+    if sev in (SeverityLevel.HIGH, SeverityLevel.CRITICAL):
+        return 0.9
+    if sev == SeverityLevel.MEDIUM:
+        return 0.6
+    return 0.1
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -74,22 +84,25 @@ def _check_rule(text: str, rule: Rule, rulebase_version: str) -> AuditLogEntry |
         if rule.type == RuleType.REGEX and rule.pattern:
             if re.search(rule.pattern, text, flags=re.IGNORECASE):
                 reason = f"Matched pattern '{rule.pattern}'"
-                action = _severity_action(rule.severity)
                 return AuditLogEntry(
                     rule_id=rule.rule_id,
                     severity=rule.severity,
-                    action=action,
+                    action=rule.action,
                     input_text=text,
                     justification=reason,
-                    suggested_fix="Remove or redact matching text",
-                    clause_id=next(iter(rule.clause_mapping.keys()), None),
-                    risk_score=None,
+                    suggested_fix=rule.suggestion,
+                    clause_id=None,
+                    risk_score=_risk_from_severity(rule.severity),
                     session_id="validation-session",
                     agent_stack=[__name__],
                     rule_version=rule.version,
                     agent_versions={__name__: __version__},
                     rulebase_version=rulebase_version,
                     execution_time=None,
+                    rule_index=rule.index,
+                    category=rule.category,
+                    source=rule.source,
+                    legal_reference=rule.legal_reference,
                 )
         elif rule.type in {RuleType.SEMANTIC, RuleType.LLM}:
             prompt = rule.llm_instruction or (
@@ -98,22 +111,25 @@ def _check_rule(text: str, rule: Rule, rulebase_version: str) -> AuditLogEntry |
             )
             response = _call_llm(prompt)
             if any(w in response.lower() for w in ("yes", "violation", "block")):
-                action = _severity_action(rule.severity)
                 return AuditLogEntry(
                     rule_id=rule.rule_id,
                     severity=rule.severity,
-                    action=action,
+                    action=rule.action,
                     input_text=text,
                     justification=response,
-                    suggested_fix="Review and modify the text to comply",
-                    clause_id=next(iter(rule.clause_mapping.keys()), None),
-                    risk_score=None,
+                    suggested_fix=rule.suggestion,
+                    clause_id=None,
+                    risk_score=_risk_from_severity(rule.severity),
                     session_id="validation-session",
                     agent_stack=[__name__],
                     rule_version=rule.version,
                     agent_versions={__name__: __version__},
                     rulebase_version=rulebase_version,
                     execution_time=None,
+                    rule_index=rule.index,
+                    category=rule.category,
+                    source=rule.source,
+                    legal_reference=rule.legal_reference,
                 )
     except Exception as exc:  # pragma: no cover - network/LLM failure
         LOGGER.error("Validation error for rule %s: %s", rule.rule_id, exc)

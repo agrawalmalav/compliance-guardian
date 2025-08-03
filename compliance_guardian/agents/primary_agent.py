@@ -85,8 +85,8 @@ def _call_llm(messages: Sequence[Dict[str, str]]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def generate_plan(prompt: str, domain: str) -> PlanSummary:
-    """Generate an execution plan from ``prompt`` for a given ``domain``.
+def generate_plan(prompt: str, domains: List[str], constraints: List[str]) -> PlanSummary:
+    """Generate an execution plan from ``prompt`` given ``domains``.
 
     The function sends the user prompt to an LLM with instructions to
     provide a JSON payload containing a ``goal`` string and a list of
@@ -101,12 +101,14 @@ def generate_plan(prompt: str, domain: str) -> PlanSummary:
         Parsed :class:`PlanSummary` describing the strategy.
     """
 
-    LOGGER.info("Generating plan for domain '%s' with prompt: %s", domain, prompt)
+    domain = domains[0] if domains else "other"
+    LOGGER.info("Generating plan for domains %s with prompt: %s", domains, prompt)
+    constraint_text = "\n".join(constraints)
     plan_system = (
-        "You are a task planner for an AI assistant. "
-        "Given the prompt: {prompt}, decompose into step-by-step actions "
-        "and the main goal. Respond in JSON with keys 'goal' and 'steps'."
-    ).format(prompt=prompt)
+        "You are a task planner for an AI assistant. Given the prompt: {prompt}, "
+        "decompose into step-by-step actions and the main goal. Respond in JSON "
+        "with keys 'goal' and 'steps'.\nCompliance constraints:\n{constraints}"
+    ).format(prompt=prompt, constraints=constraint_text)
 
     messages = [{"role": "system", "content": plan_system}]
     try:

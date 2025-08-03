@@ -20,6 +20,7 @@ class TestComplianceAgent:
             severity="high",
             domain="other",
             pattern="foo",
+            action="BLOCK",
         )
 
     @pytest.fixture()
@@ -30,6 +31,7 @@ class TestComplianceAgent:
             type=models.RuleType.SEMANTIC,
             severity="high",
             domain="other",
+            action="BLOCK",
         )
 
     def test_check_plan_no_violation(self, regex_rule):
@@ -40,8 +42,8 @@ class TestComplianceAgent:
             sub_actions=["bar"],
             original_prompt="p",
         )
-        allowed, entry = compliance_agent.check_plan(plan, [regex_rule], "v1")
-        assert allowed and entry is None
+        allowed, entries = compliance_agent.check_plan(plan, [regex_rule], "v1")
+        assert allowed and not entries
 
     def test_check_plan_regex_block(self, regex_rule):
         plan = models.PlanSummary(
@@ -51,9 +53,9 @@ class TestComplianceAgent:
             sub_actions=["foo"],
             original_prompt="p",
         )
-        allowed, entry = compliance_agent.check_plan(plan, [regex_rule], "v1")
+        allowed, entries = compliance_agent.check_plan(plan, [regex_rule], "v1")
         assert not allowed
-        assert entry and entry.action == "BLOCK"
+        assert entries and entries[0].action == "BLOCK"
 
     def test_check_plan_semantic(self, semantic_rule):
         plan = models.PlanSummary(
@@ -66,11 +68,11 @@ class TestComplianceAgent:
         with patch.object(
             compliance_agent, "_call_llm", return_value="Yes violation"
         ):
-            allowed, entry = compliance_agent.check_plan(
+            allowed, entries = compliance_agent.check_plan(
                 plan, [semantic_rule], "v1"
             )
             assert not allowed
-            assert entry and "violation" in entry.justification.lower()
+            assert entries and "violation" in entries[0].justification.lower()
 
     def test_check_plan_llm_failure(self, semantic_rule):
         plan = models.PlanSummary(
@@ -85,11 +87,11 @@ class TestComplianceAgent:
             "_call_llm",
             side_effect=RuntimeError("boom"),
         ):
-            allowed, entry = compliance_agent.check_plan(
+            allowed, entries = compliance_agent.check_plan(
                 plan, [semantic_rule], "v1"
             )
             assert not allowed
-            assert entry and "failed" in entry.justification
+            assert entries and "failed" in entries[0].justification
 
     def test_post_output_check(self, regex_rule):
         allowed, entries = compliance_agent.post_output_check(
