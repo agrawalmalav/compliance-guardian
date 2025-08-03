@@ -328,12 +328,17 @@ class RuleSelector:
 
 
 app = typer.Typer(help="CLI for inspecting compliance rules")
-selector = RuleSelector()
+
+
+def _build_selector() -> RuleSelector:
+    """Create a new ``RuleSelector`` instance."""
+    return RuleSelector()
 
 
 @app.command()
 def print_rules(domain: str) -> None:
     """Print all rules for a domain."""
+    selector = _build_selector()
     for rule in selector.load(domain):
         typer.echo(rule.json())
 
@@ -341,6 +346,7 @@ def print_rules(domain: str) -> None:
 @app.command()
 def search(domain: str, term: str) -> None:
     """Search rule descriptions for a term."""
+    selector = _build_selector()
     for rule in selector.search(domain, term):
         typer.echo(rule.json())
 
@@ -348,6 +354,7 @@ def search(domain: str, term: str) -> None:
 @app.command()
 def validate(domain: str) -> None:
     """Validate rule file and display any errors."""
+    selector = _build_selector()
     errors = selector.validate(domain)
     if errors:
         for err in errors:
@@ -357,6 +364,7 @@ def validate(domain: str) -> None:
 
 
 if __name__ == "__main__":
+    selector = _build_selector()
     for d in ("scraping", "finance", "medical"):
         print(f"\nDomain: {d}")
         for r in selector.load(d):

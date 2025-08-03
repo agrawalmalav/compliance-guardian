@@ -76,6 +76,7 @@ def run_pipeline(
     *,
     interactive: bool = True,
     llm: Optional[str] = None,
+    selector: Optional[rule_selector.RuleSelector] = None,
 ) -> Tuple[str, str, List[AuditLogEntry]]:
     """Run the end-to-end compliance pipeline for ``prompt``.
 
@@ -87,6 +88,10 @@ def run_pipeline(
         Identifier to tag audit log entries with.
     interactive:
         When ``True`` ask the user how to proceed on warnings or blocks.
+    llm:
+        Optional identifier for the LLM provider.
+    selector:
+        Optional :class:`RuleSelector` to reuse across retries or prompts.
 
     Returns
     -------
@@ -119,7 +124,7 @@ def run_pipeline(
     )
 
     # --- Rule aggregation ---
-    selector = rule_selector.RuleSelector()
+    selector = selector or rule_selector.RuleSelector()
     rules, rulebase_ver = selector.aggregate(domains, user_rules)
     LOGGER.info("Loaded %d total rules", len(rules))
 
@@ -129,6 +134,7 @@ def run_pipeline(
     plan = primary_agent.generate_plan(prompt, domains, injections, llm=llm)
     duration = time.time() - start
     LOGGER.info("Generated plan in %.2fs", duration)
+    LOGGER.info("Plan:\n%s", plan.action_plan)
     entries.append(
         AuditLogEntry(
             rule_id="PLAN",
@@ -159,7 +165,11 @@ def run_pipeline(
         LOGGER.warning("Plan violation %s with action BLOCK", first.rule_id)
         if interactive and _prompt_yes("Plan blocked. Generate new plan?"):
             return run_pipeline(
-                prompt, session_id, interactive=interactive, llm=llm
+                prompt,
+                session_id,
+                interactive=interactive,
+                llm=llm,
+                selector=selector,
             )
 
         return "", "block", entries
@@ -245,10 +255,13 @@ def run(
     else:
         raise typer.BadParameter("Provide --prompt or --batch")
 
+    selector = rule_selector.RuleSelector()
     for idx, prmpt in enumerate(prompts, start=1):
         typer.echo(f"\n### Processing prompt {idx}")
         try:
-            output, action, _ = run_pipeline(prmpt, session_id, llm=llm)
+            output, action, _ = run_pipeline(
+                prmpt, session_id, llm=llm, selector=selector
+            )
         except Exception as exc:  # pragma: no cover
             LOGGER.exception("Pipeline failed: %s", exc)
             continue
