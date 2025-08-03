@@ -24,6 +24,17 @@ class TestModels:
         with pytest.raises(ValueError):
             models.Rule.from_dict({"rule_id": "R2"})
 
+    def test_rule_missing_domain_defaults_other(self):
+        data = {
+            "rule_id": "R3",
+            "description": "desc",
+            "type": "security",
+            "severity": "high",
+            "domain": None,
+        }
+        rule = models.Rule.from_dict(data)
+        assert rule.domain == models.ComplianceDomain.OTHER
+
     def test_audit_log_entry_serialization(self):
         entry = models.AuditLogEntry(
             rule_id="R1",

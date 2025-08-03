@@ -154,11 +154,14 @@ class Rule(BaseModel):
                     data["type"] = RuleType(data["type"])
                 except ValueError:
                     data["type"] = RuleType[data["type"].upper()]
-            if isinstance(data.get("domain"), str):
+            domain = data.get("domain")
+            if isinstance(domain, str):
                 try:
-                    data["domain"] = ComplianceDomain(data["domain"])
+                    data["domain"] = ComplianceDomain(domain)
                 except ValueError:
                     data["domain"] = ComplianceDomain.OTHER
+            elif not isinstance(domain, ComplianceDomain):
+                data["domain"] = ComplianceDomain.OTHER
             if "severity" in data and isinstance(data["severity"], str):
                 try:
                     data["severity"] = SeverityLevel(data["severity"])
@@ -191,6 +194,14 @@ class Rule(BaseModel):
             return self.dict()
         except Exception as exc:  # pragma: no cover - extremely unlikely
             raise ValueError(f"Unable to serialize Rule: {exc}") from exc
+
+
+class RuleSummary(BaseModel):
+    """Lightweight rule representation for LLM context."""
+
+    rule_id: str
+    description: Optional[str] = None
+    pattern: Optional[str] = None
 
 
 class AuditLogEntry(BaseModel):

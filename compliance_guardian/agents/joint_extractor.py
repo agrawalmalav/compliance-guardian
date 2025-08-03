@@ -78,10 +78,14 @@ def _llm_extract(prompt: str, llm: Optional[str]) -> Tuple[List[str], List[Rule]
             genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
             model = genai.GenerativeModel("gemini-2.5-flash")
             res = model.generate_content(system)
-            raw = res.text
+            raw = res.text or "{}"
         else:
             raise RuntimeError("No LLM credentials available")
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:  # pragma: no cover - invalid JSON
+            LOGGER.warning("LLM joint extraction failed: %s; output=%r", exc, raw)
+            data = {}
         domains = data.get("domains") or []
         instructions = data.get("instructions") or []
     except Exception as exc:  # pragma: no cover - network/LLM errors

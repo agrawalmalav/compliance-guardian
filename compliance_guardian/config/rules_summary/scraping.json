@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "rules": [
+    {
+      "rule_id": "SCR001",
+      "description": "Block collection of email addresses or phone numbers without user consent.",
+      "pattern": "(?i)([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})|((?:\\+?\\d{1,3})?\\s?(?:\\(\\d{1,4}\\)|\\d{1,4})?[\\s-]?\\d{3}[\\s-]?\\d{4})"
+    },
+    {
+      "rule_id": "SCR002",
+      "description": "Respect robots.txt and meta tags prohibiting scraping.",
+      "pattern": null
+    },
+    {
+      "rule_id": "SCR003",
+      "description": "Ensure explicit consent before scraping social media profiles.",
+      "pattern": null
+    },
+    {
+      "rule_id": "SCR004",
+      "description": "Avoid scraping text marked with copyright notices or 'all rights reserved'.",
+      "pattern": "(?i)(©|\\ball rights reserved\\b)"
+    },
+    {
+      "rule_id": "SCR005",
+      "description": "Do not circumvent paywalls or authentication mechanisms while scraping.",
+      "pattern": null
+    }
+  ]
+}
