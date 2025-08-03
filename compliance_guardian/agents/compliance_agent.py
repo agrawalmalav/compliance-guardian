@@ -178,6 +178,7 @@ def check_plan(
     rules: List[Rule],
     rulebase_version: str,
     llm: Optional[str] = None,
+
 ) -> Tuple[bool, List[AuditLogEntry]]:
     """Validate a :class:`PlanSummary` against compliance ``rules``.
 

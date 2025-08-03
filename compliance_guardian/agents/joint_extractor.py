@@ -17,6 +17,7 @@ import os
 import re
 from typing import List, Tuple, Optional
 
+
 from compliance_guardian.utils.models import (
     Rule,
     RuleType,
@@ -56,6 +57,7 @@ def _llm_extract(prompt: str, llm: Optional[str]) -> Tuple[List[str], List[Rule]
         first available provider.
     """
 
+
     system = (
         "Classify the prompt into domains (scraping, finance, medical, other) "
         "and extract explicit user instructions starting with phrases like "
@@ -64,6 +66,7 @@ def _llm_extract(prompt: str, llm: Optional[str]) -> Tuple[List[str], List[Rule]
     ).format(prompt=prompt)
     try:
         if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
+
             client = openai.OpenAI()
             resp = client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -132,6 +135,7 @@ def extract(prompt: str, llm: Optional[str] = None) -> Tuple[List[str], List[Rul
 
     if openai or genai:
         domains, rules = _llm_extract(prompt, llm)
+
         if domains:
             return domains, rules
     domains = _heuristic_domains(prompt)

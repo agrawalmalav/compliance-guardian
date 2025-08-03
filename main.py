@@ -161,6 +161,7 @@ def run_pipeline(
             return run_pipeline(
                 prompt, session_id, interactive=interactive, llm=llm
             )
+
         return "", "block", entries
     if warn_entries:
         summary = ", ".join(

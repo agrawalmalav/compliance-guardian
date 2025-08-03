@@ -88,6 +88,7 @@ def _call_llm(messages: Sequence[Dict[str, str]], llm: Optional[str]) -> str:
 def generate_plan(
     prompt: str, domains: List[str], constraints: List[str], llm: Optional[str] = None
 ) -> PlanSummary:
+
     """Generate an execution plan from ``prompt`` given ``domains``.
 
     The function sends the user prompt to an LLM with instructions to
