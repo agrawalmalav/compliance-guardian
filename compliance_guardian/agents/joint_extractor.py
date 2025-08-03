@@ -15,7 +15,8 @@ import json
 import logging
 import os
 import re
-from typing import List, Tuple
+from typing import List, Tuple, Optional
+
 
 from compliance_guardian.utils.models import (
     Rule,
@@ -44,8 +45,18 @@ _KEYWORDS = {
 }
 
 
-def _llm_extract(prompt: str) -> Tuple[List[str], List[Rule]]:
-    """Use an LLM to obtain domains and instructions."""
+def _llm_extract(prompt: str, llm: Optional[str]) -> Tuple[List[str], List[Rule]]:
+    """Use an LLM to obtain domains and instructions.
+
+    Parameters
+    ----------
+    prompt:
+        User provided text to analyse.
+    llm:
+        Preferred LLM provider (``"openai"`` or ``"gemini"``). ``None`` uses the
+        first available provider.
+    """
+
 
     system = (
         "Classify the prompt into domains (scraping, finance, medical, other) "
@@ -54,7 +65,8 @@ def _llm_extract(prompt: str) -> Tuple[List[str], List[Rule]]:
         "(list) and 'instructions' (list of strings). Prompt: {prompt}"
     ).format(prompt=prompt)
     try:
-        if openai and os.getenv("OPENAI_API_KEY"):
+        if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
+
             client = openai.OpenAI()
             resp = client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -62,7 +74,7 @@ def _llm_extract(prompt: str) -> Tuple[List[str], List[Rule]]:
                 temperature=0,
             )
             raw = resp.choices[0].message.content or "{}"
-        elif genai and os.getenv("GEMINI_API_KEY"):
+        elif (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
             genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
             model = genai.GenerativeModel("gemini-pro")
             res = model.generate_content(system)
@@ -110,11 +122,20 @@ def _heuristic_instructions(prompt: str) -> List[Rule]:
     return [_build_user_rule(i + 1, m.strip()) for i, m in enumerate(matches)]
 
 
-def extract(prompt: str) -> Tuple[List[str], List[Rule]]:
-    """Return domains and user rules for ``prompt``."""
+def extract(prompt: str, llm: Optional[str] = None) -> Tuple[List[str], List[Rule]]:
+    """Return domains and user rules for ``prompt``.
+
+    Parameters
+    ----------
+    prompt:
+        User provided text to inspect.
+    llm:
+        Preferred LLM provider. ``None`` chooses the first configured provider.
+    """
 
     if openai or genai:
-        domains, rules = _llm_extract(prompt)
+        domains, rules = _llm_extract(prompt, llm)
+
         if domains:
             return domains, rules
     domains = _heuristic_domains(prompt)

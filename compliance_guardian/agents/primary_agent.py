@@ -25,7 +25,7 @@ __version__ = "0.2.1"
 import json
 import logging
 import os
-from typing import List, Sequence, Dict
+from typing import List, Sequence, Dict, Optional
 
 try:
     import openai  # type: ignore
@@ -63,9 +63,9 @@ def _coerce_domain(domain: str) -> ComplianceDomain:
 # ---------------------------------------------------------------------------
 
 
-def _call_llm(messages: Sequence[Dict[str, str]]) -> str:
+def _call_llm(messages: Sequence[Dict[str, str]], llm: Optional[str]) -> str:
     """Internal helper to call either OpenAI or Gemini models."""
-    if openai and os.getenv("OPENAI_API_KEY"):
+    if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
         client = openai.OpenAI()
         resp = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -73,7 +73,7 @@ def _call_llm(messages: Sequence[Dict[str, str]]) -> str:
         )
         content = resp.choices[0].message.content or ""
         return content.strip()
-    if genai and os.getenv("GEMINI_API_KEY"):
+    if (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         model = genai.GenerativeModel("gemini-pro")
         res = model.generate_content("\n".join(m["content"] for m in messages))
@@ -85,7 +85,10 @@ def _call_llm(messages: Sequence[Dict[str, str]]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def generate_plan(prompt: str, domains: List[str], constraints: List[str]) -> PlanSummary:
+def generate_plan(
+    prompt: str, domains: List[str], constraints: List[str], llm: Optional[str] = None
+) -> PlanSummary:
+
     """Generate an execution plan from ``prompt`` given ``domains``.
 
     The function sends the user prompt to an LLM with instructions to
@@ -112,7 +115,7 @@ def generate_plan(prompt: str, domains: List[str], constraints: List[str]) -> Pl
 
     messages = [{"role": "system", "content": plan_system}]
     try:
-        reply = _call_llm(messages)
+        reply = _call_llm(messages, llm)
         parsed = json.loads(reply)
         goal = parsed.get("goal", prompt)
         steps = parsed.get("steps", [])
@@ -138,7 +141,12 @@ def generate_plan(prompt: str, domains: List[str], constraints: List[str]) -> Pl
 # ---------------------------------------------------------------------------
 
 
-def execute_task(plan: PlanSummary, rules: List[Rule], approved: bool) -> str:
+def execute_task(
+    plan: PlanSummary,
+    rules: List[Rule],
+    approved: bool,
+    llm: Optional[str] = None,
+) -> str:
     """Execute ``plan`` under ``rules`` if ``approved``.
 
     The rules are injected as part of the system prompt so the LLM
@@ -175,7 +183,7 @@ def execute_task(plan: PlanSummary, rules: List[Rule], approved: bool) -> str:
 
     LOGGER.info("Executing plan with %d rule constraints", len(rules))
     try:
-        output = _call_llm(messages)
+        output = _call_llm(messages, llm)
     except Exception as exc:  # pragma: no cover - network errors
         LOGGER.error("LLM execution failed: %s", exc)
         output = "Execution failed due to LLM error"

@@ -44,11 +44,11 @@ logging.basicConfig(level=logging.INFO)
 # ---------------------------------------------------------------------------
 
 
-def _call_llm(prompt: str) -> str:
+def _call_llm(prompt: str, llm: Optional[str]) -> str:
     """Invoke the configured LLM with ``prompt`` and return the response."""
 
     LOGGER.debug("LLM prompt: %s", prompt)
-    if openai and os.getenv("OPENAI_API_KEY"):
+    if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
         client = openai.OpenAI()
         resp = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -57,7 +57,7 @@ def _call_llm(prompt: str) -> str:
         )
         content = resp.choices[0].message.content or ""
         return content.strip()
-    if genai and os.getenv("GEMINI_API_KEY"):
+    if (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         model = genai.GenerativeModel("gemini-pro")
         res = model.generate_content(prompt)
@@ -119,7 +119,7 @@ def _build_audit_entry(
 
 
 def _check_text_against_rule(
-    text: str, rule: Rule, rulebase_version: str
+    text: str, rule: Rule, rulebase_version: str, llm: Optional[str]
 ) -> Optional[AuditLogEntry]:
     """Check ``text`` against a single compliance ``rule``.
 
@@ -146,14 +146,14 @@ def _check_text_against_rule(
                 "Does the following plan violate this rule: "
                 f"{rule.description}? Explain.\n\n{text}"
             )
-            response = _call_llm(prompt)
+            response = _call_llm(prompt, llm)
             if any(w in response.lower() for w in ("yes", "violation", "block")):
                 LOGGER.info("Semantic violation for rule %s", rule.rule_id)
                 return _build_audit_entry(
                     rule, text, response, rulebase_version=rulebase_version
                 )
         elif rule.type == RuleType.LLM and rule.llm_instruction:
-            response = _call_llm(rule.llm_instruction + "\n\n" + text)
+            response = _call_llm(rule.llm_instruction + "\n\n" + text, llm)
             if any(w in response.lower() for w in ("block", "violation", "yes")):
                 LOGGER.info("LLM violation for rule %s", rule.rule_id)
                 return _build_audit_entry(
@@ -174,7 +174,11 @@ def _check_text_against_rule(
 
 
 def check_plan(
-    plan: PlanSummary, rules: List[Rule], rulebase_version: str
+    plan: PlanSummary,
+    rules: List[Rule],
+    rulebase_version: str,
+    llm: Optional[str] = None,
+
 ) -> Tuple[bool, List[AuditLogEntry]]:
     """Validate a :class:`PlanSummary` against compliance ``rules``.
 
@@ -187,7 +191,9 @@ def check_plan(
     entries: List[AuditLogEntry] = []
     allowed = True
     for rule in rules:
-        entry = _check_text_against_rule(plan.action_plan, rule, rulebase_version)
+        entry = _check_text_against_rule(
+            plan.action_plan, rule, rulebase_version, llm
+        )
         if entry:
             entries.append(entry)
             if entry.action == "BLOCK":
@@ -203,7 +209,10 @@ def check_plan(
 
 
 def post_output_check(
-    output: str, rules: List[Rule], rulebase_version: str
+    output: str,
+    rules: List[Rule],
+    rulebase_version: str,
+    llm: Optional[str] = None,
 ) -> Tuple[bool, List[AuditLogEntry]]:
     """Validate final ``output`` text against ``rules``.
 
@@ -224,7 +233,7 @@ def post_output_check(
     entries: List[AuditLogEntry] = []
     allowed = True
     for rule in rules:
-        entry = _check_text_against_rule(output, rule, rulebase_version)
+        entry = _check_text_against_rule(output, rule, rulebase_version, llm)
         if entry:
             entries.append(entry)
             if entry.action == "BLOCK":

@@ -71,7 +71,11 @@ def _prompt_yes(question: str) -> bool:
 
 
 def run_pipeline(
-    prompt: str, session_id: str, *, interactive: bool = True
+    prompt: str,
+    session_id: str,
+    *,
+    interactive: bool = True,
+    llm: Optional[str] = None,
 ) -> Tuple[str, str, List[AuditLogEntry]]:
     """Run the end-to-end compliance pipeline for ``prompt``.
 
@@ -95,7 +99,7 @@ def run_pipeline(
 
     # --- Joint extraction ---
     start = time.time()
-    domains, user_rules = joint_extractor.extract(prompt)
+    domains, user_rules = joint_extractor.extract(prompt, llm=llm)
     duration = time.time() - start
     LOGGER.info("Joint extractor found domains %s in %.2fs", domains, duration)
     entries.append(
@@ -122,7 +126,7 @@ def run_pipeline(
     # --- Plan generation ---
     start = time.time()
     injections = [r.llm_instruction for r in rules if r.llm_instruction]
-    plan = primary_agent.generate_plan(prompt, domains, injections)
+    plan = primary_agent.generate_plan(prompt, domains, injections, llm=llm)
     duration = time.time() - start
     LOGGER.info("Generated plan in %.2fs", duration)
     entries.append(
@@ -142,7 +146,9 @@ def run_pipeline(
     )
 
     # --- Pre-execution compliance check ---
-    allowed, plan_entries = compliance_agent.check_plan(plan, rules, rulebase_ver)
+    allowed, plan_entries = compliance_agent.check_plan(
+        plan, rules, rulebase_ver, llm=llm
+    )
     for entry in plan_entries:
         log_decision(entry)
     entries.extend(plan_entries)
@@ -151,8 +157,11 @@ def run_pipeline(
     if block_entries:
         first = block_entries[0]
         LOGGER.warning("Plan violation %s with action BLOCK", first.rule_id)
-        if interactive and _prompt_yes("Plan blocked. Generate new plan?" ):
-            return run_pipeline(prompt, session_id, interactive=interactive)
+        if interactive and _prompt_yes("Plan blocked. Generate new plan?"):
+            return run_pipeline(
+                prompt, session_id, interactive=interactive, llm=llm
+            )
+
         return "", "block", entries
     if warn_entries:
         summary = ", ".join(
@@ -169,7 +178,7 @@ def run_pipeline(
 
     # --- Execution ---
     start = time.time()
-    output = primary_agent.execute_task(plan, rules, approved=True)
+    output = primary_agent.execute_task(plan, rules, approved=True, llm=llm)
     exec_duration = time.time() - start
     LOGGER.info("Executed plan in %.2fs", exec_duration)
 
@@ -178,6 +187,7 @@ def run_pipeline(
         output,
         rules,
         rulebase_ver,
+        llm=llm,
     )
     for entry in out_entries:
         log_decision(entry)
@@ -219,6 +229,11 @@ def run(
         "--session-id",
         help="Session id",
     ),
+    llm: Optional[str] = typer.Option(
+        None,
+        "--llm",
+        help="LLM provider to use (e.g. 'openai' or 'gemini')",
+    ),
 ) -> None:
     """Process one or more prompts through the compliance pipeline."""
 
@@ -233,7 +248,7 @@ def run(
     for idx, prmpt in enumerate(prompts, start=1):
         typer.echo(f"\n### Processing prompt {idx}")
         try:
-            output, action, _ = run_pipeline(prmpt, session_id)
+            output, action, _ = run_pipeline(prmpt, session_id, llm=llm)
         except Exception as exc:  # pragma: no cover
             LOGGER.exception("Pipeline failed: %s", exc)
             continue
