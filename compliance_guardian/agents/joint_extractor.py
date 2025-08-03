@@ -24,6 +24,7 @@ from compliance_guardian.utils.models import (
     SeverityLevel,
     ComplianceDomain,
 )
+from compliance_guardian.utils.text import _strip_code_fence
 
 try:
     import openai  # type: ignore
@@ -74,11 +75,13 @@ def _llm_extract(prompt: str, llm: Optional[str]) -> Tuple[List[str], List[Rule]
                 temperature=0,
             )
             raw = resp.choices[0].message.content or "{}"
+            raw = _strip_code_fence(raw)
         elif (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
             genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
             model = genai.GenerativeModel("gemini-2.5-flash")
             res = model.generate_content(system)
             raw = res.text or "{}"
+            raw = _strip_code_fence(raw)
         else:
             raise RuntimeError("No LLM credentials available")
         try:

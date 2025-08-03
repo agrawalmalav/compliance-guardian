@@ -44,6 +44,7 @@ from compliance_guardian.utils.models import (
     RuleType,
     SeverityLevel,
 )
+from compliance_guardian.utils.text import _strip_code_fence
 
 LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -116,6 +117,7 @@ def generate_plan(
     messages = [{"role": "system", "content": plan_system}]
     try:
         reply = _call_llm(messages, llm)
+        reply = _strip_code_fence(reply)
         parsed = json.loads(reply)
         goal = parsed.get("goal", prompt)
         steps = parsed.get("steps", [])
