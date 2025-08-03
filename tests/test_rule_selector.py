@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from compliance_guardian.agents import rule_selector
-from compliance_guardian.utils.models import Rule
+from compliance_guardian.utils.models import Rule, RuleSummary
 
 
 class TestRuleSelector:
@@ -72,3 +72,25 @@ class TestRuleSelector:
         sel = rule_selector.RuleSelector(rules_dir=tmp_rules)
         with pytest.raises(rule_selector.RuleLoadError):
             sel.load("missing")
+
+    def test_prompt_rules_lookup(self, tmp_rules, monkeypatch):
+        monkeypatch.setattr(rule_selector, "Observer", MagicMock())
+        prompt_dir = tmp_rules.parent / "prompts"
+        prompt_dir.mkdir()
+        data = {
+            "version": "1.0.0",
+            "rules": [
+                {"rule_id": "T1", "description": "Must say foo", "pattern": "foo"}
+            ],
+        }
+        (prompt_dir / "generic.json").write_text(
+            json.dumps(data), encoding="utf-8"
+        )
+        sel = rule_selector.RuleSelector(
+            rules_dir=tmp_rules, summary_dir=prompt_dir
+        )
+        prompts = sel.load_prompt_rules("generic")
+        assert isinstance(prompts[0], RuleSummary)
+        assert prompts[0].description == "Must say foo"
+        full = sel.get_rule("generic", "T1")
+        assert full and full.pattern == "foo"

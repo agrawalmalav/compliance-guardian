@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "rules": [
+    {
+      "rule_id": "GEN001",
+      "description": "Discourage rude or insulting language; respond politely.",
+      "pattern": null
+    }
+  ]
+}

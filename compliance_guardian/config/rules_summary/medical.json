@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "rules": [
+    {
+      "rule_id": "MED001",
+      "description": "Mask patient identifiers such as patient IDs or SSNs.",
+      "pattern": "(?i)(patient\\s*id[:=]\\s*\\d+|\\b\\d{3}-\\d{2}-\\d{4}\\b)"
+    },
+    {
+      "rule_id": "MED002",
+      "description": "Flag unsubstantiated miracle cure claims.",
+      "pattern": null
+    },
+    {
+      "rule_id": "MED003",
+      "description": "Require informed consent before using patient data for research.",
+      "pattern": null
+    },
+    {
+      "rule_id": "MED004",
+      "description": "Detect biased or discriminatory language in clinical notes.",
+      "pattern": null
+    },
+    {
+      "rule_id": "MED005",
+      "description": "Avoid copying entire copyrighted medical articles.",
+      "pattern": "(?i)(©|\\ball rights reserved\\b)\\s.*medical"
+    }
+  ]
+}

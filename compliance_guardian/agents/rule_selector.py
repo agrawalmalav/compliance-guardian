@@ -21,7 +21,7 @@ else:  # pragma: no cover
     Observer = WatchdogObserver
 import typer
 
-from compliance_guardian.utils.models import Rule, ComplianceDomain
+from compliance_guardian.utils.models import Rule, RuleSummary, ComplianceDomain
 
 
 LOGGER = logging.getLogger(__name__)
@@ -59,10 +59,17 @@ class RuleSelector:
     when changed.
     """
 
-    def __init__(self, rules_dir: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        rules_dir: Optional[Path] = None,
+        summary_dir: Optional[Path] = None,
+    ) -> None:
         default_dir = Path(__file__).resolve().parents[1] / "config" / "rules"
         self.rules_dir = rules_dir or default_dir
+        default_summary = self.rules_dir.parent / "rules_summary"
+        self.summary_dir = summary_dir or default_summary
         self._cache: Dict[str, List[Rule]] = {}
+        self._summary_cache: Dict[str, List[RuleSummary]] = {}
         self._versions: Dict[str, str] = {}
         self._observer: Optional[Any] = None
         self._start_watcher()
@@ -165,11 +172,59 @@ class RuleSelector:
         return rules
 
     # ------------------------------------------------------------
+    def _load_summary_file(self, domain: str) -> List[RuleSummary]:
+        """Load lightweight rule summaries for ``domain``."""
+
+        path = self.summary_dir / f"{domain}.json"
+        if not path.exists():
+            raise RuleLoadError(f"Rule summary file not found: {path}")
+
+        try:
+            raw = path.read_text(encoding="utf-8")
+            data = json.loads(self._strip_comments(raw))
+        except Exception as exc:
+            raise RuleLoadError(f"Failed to parse {path}: {exc}") from exc
+
+        if isinstance(data, dict):
+            entries = data.get("rules", [])
+        elif isinstance(data, list):
+            entries = data
+        else:
+            raise RuleLoadError(
+                f"Rule summary file {path} must contain a list or object"
+            )
+
+        summaries: List[RuleSummary] = []
+        for idx, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                LOGGER.error(
+                    "Invalid rule summary at index %s: not an object", idx
+                )
+                continue
+            try:
+                summaries.append(RuleSummary(**entry))
+            except Exception as exc:
+                LOGGER.error(
+                    "Skipping rule summary %s due to validation error: %s",
+                    idx,
+                    exc,
+                )
+        return summaries
+
+    # ------------------------------------------------------------
     def load(self, domain: str) -> List[Rule]:
         """Return rules for a domain, loading them if necessary."""
         if domain not in self._cache:
             self._cache[domain] = self._load_file(domain)
         return self._cache[domain]
+
+    # ------------------------------------------------------------
+    def load_prompt_rules(self, domain: str) -> List[RuleSummary]:
+        """Return lightweight rules for LLM context."""
+
+        if domain not in self._summary_cache:
+            self._summary_cache[domain] = self._load_summary_file(domain)
+        return self._summary_cache[domain]
 
     # ------------------------------------------------------------
     def get_version(self, domain: str) -> str:
@@ -181,6 +236,15 @@ class RuleSelector:
         """Force reload of rules for a domain."""
         self._cache[domain] = self._load_file(domain)
         LOGGER.info("Reloaded rules for domain %s", domain)
+
+    # ------------------------------------------------------------
+    def get_rule(self, domain: str, rule_id: str) -> Optional[Rule]:
+        """Return full rule details for ``rule_id`` in ``domain``."""
+
+        for rule in self.load(domain):
+            if rule.rule_id == rule_id:
+                return rule
+        return None
 
     # ------------------------------------------------------------
     def search(self, domain: str, term: str) -> List[Rule]:
