@@ -34,6 +34,9 @@ logging.basicConfig(level=logging.INFO)
 
 app = typer.Typer(help="Run compliance pipeline on prompts")
 
+# Maximum number of times the pipeline will attempt to regenerate a plan
+# after a blocked plan before giving up.
+MAX_RETRIES = 3
 
 # ---------------------------------------------------------------------------
 
@@ -77,6 +80,7 @@ def run_pipeline(
     interactive: bool = True,
     llm: Optional[str] = None,
     selector: Optional[rule_selector.RuleSelector] = None,
+    retry_count: int = 0,
 ) -> Tuple[str, str, List[AuditLogEntry]]:
     """Run the end-to-end compliance pipeline for ``prompt``.
 
@@ -92,6 +96,9 @@ def run_pipeline(
         Optional identifier for the LLM provider.
     selector:
         Optional :class:`RuleSelector` to reuse across retries or prompts.
+    retry_count:
+        Internal counter tracking how many times plan generation has been
+        retried after a block.
 
     Returns
     -------
@@ -164,12 +171,21 @@ def run_pipeline(
         first = block_entries[0]
         LOGGER.warning("Plan violation %s with action BLOCK", first.rule_id)
         if interactive and _prompt_yes("Plan blocked. Generate new plan?"):
+            if retry_count >= MAX_RETRIES:
+                typer.echo(
+                    "Plan generation failed after multiple attempts."
+                )
+                LOGGER.error(
+                    "Retry limit of %d reached; aborting", MAX_RETRIES
+                )
+                return "", "block", entries
             return run_pipeline(
                 prompt,
                 session_id,
                 interactive=interactive,
                 llm=llm,
                 selector=selector,
+                retry_count=retry_count + 1,
             )
 
         return "", "block", entries
