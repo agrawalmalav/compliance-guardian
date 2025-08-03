@@ -117,6 +117,22 @@ class Rule(BaseModel):
     example_violation: Optional[str] = Field(
         None, description="Example text that violates the rule."
     )
+    index: int = Field(
+        0, description="Unique integer index for fast lookup/logging."
+    )
+    category: str = Field(
+        "generic", description="Rule category: generic, domain or user."
+    )
+    action: str = Field(
+        "LOG", description="Prescribed action: BLOCK, WARN or LOG."
+    )
+    suggestion: Optional[str] = Field(
+        None,
+        description="Suggested alternative if the rule blocks execution."
+    )
+    source: str = Field(
+        "builtin", description="Origin of the rule: builtin or user."
+    )
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Rule":
@@ -137,8 +153,33 @@ class Rule(BaseModel):
                 try:
                     data["type"] = RuleType(data["type"])
                 except ValueError:
-                    # allow using enum member names as strings
                     data["type"] = RuleType[data["type"].upper()]
+            if isinstance(data.get("domain"), str):
+                try:
+                    data["domain"] = ComplianceDomain(data["domain"])
+                except ValueError:
+                    data["domain"] = ComplianceDomain.OTHER
+            if "severity" in data and isinstance(data["severity"], str):
+                try:
+                    data["severity"] = SeverityLevel(data["severity"])
+                except ValueError:
+                    data["severity"] = SeverityLevel[data["severity"].upper()]
+            if "action" not in data:
+                sev = data.get("severity", SeverityLevel.LOW)
+                if isinstance(sev, str):
+                    try:
+                        sev = SeverityLevel(sev)
+                    except ValueError:
+                        sev = SeverityLevel.LOW
+                if sev in (SeverityLevel.HIGH, SeverityLevel.CRITICAL):
+                    data["action"] = "BLOCK"
+                elif sev == SeverityLevel.MEDIUM:
+                    data["action"] = "WARN"
+                else:
+                    data["action"] = "LOG"
+            data.setdefault("category", "generic")
+            data.setdefault("source", "builtin")
+            data.setdefault("index", 0)
             return cls(**data)
         except ValidationError as exc:
             raise ValueError(f"Invalid Rule data: {exc}") from exc
@@ -214,6 +255,18 @@ class AuditLogEntry(BaseModel):
     )
     execution_time: Optional[float] = Field(
         None, description="Time taken to execute in seconds."
+    )
+    rule_index: Optional[int] = Field(
+        None, description="Unique index assigned to the rule."
+    )
+    category: Optional[str] = Field(
+        None, description="Rule category triggering the entry."
+    )
+    source: Optional[str] = Field(
+        None, description="Rule source (builtin or user)."
+    )
+    legal_reference: Optional[str] = Field(
+        None, description="Legal reference associated with the rule."
     )
 
     @classmethod

@@ -18,6 +18,7 @@ class TestPrimaryAgent:
             severity="low",
             domain="other",
             pattern="foo",
+            action="LOG",
         )
 
     def test_generate_plan_success(self):
@@ -26,7 +27,7 @@ class TestPrimaryAgent:
             "_call_llm",
             return_value='{"goal":"g","steps":["a","b"]}',
         ):
-            plan = primary_agent.generate_plan("prompt", "other")
+            plan = primary_agent.generate_plan("prompt", ["other"], [])
             assert plan.goal == "g"
             assert plan.sub_actions == ["a", "b"]
 
@@ -34,7 +35,7 @@ class TestPrimaryAgent:
         with patch.object(
             primary_agent, "_call_llm", side_effect=ValueError("fail")
         ):
-            plan = primary_agent.generate_plan("p", "other")
+            plan = primary_agent.generate_plan("p", ["other"], [])
             assert plan.goal == "p"
             assert plan.sub_actions == ["p"]
 

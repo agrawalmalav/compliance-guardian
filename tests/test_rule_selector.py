@@ -17,17 +17,25 @@ class TestRuleSelector:
     def tmp_rules(self, tmp_path):
         d = tmp_path / "rules"
         d.mkdir()
-        data = [
-            {
-                "rule_id": "T1",
-                "description": "Must say foo",
-                "type": "content",
-                "severity": "low",
-                "pattern": "foo",
-                "domain": "other",
-            }
-        ]
-        (d / "other.json").write_text(json.dumps(data), encoding="utf-8")
+        data = {
+            "version": "1.0.0",
+            "rules": [
+                {
+                    "rule_id": "T1",
+                    "description": "Must say foo",
+                    "type": "REGEX",
+                    "severity": "low",
+                    "pattern": "foo",
+                    "domain": "generic",
+                    "index": 1,
+                    "category": "generic",
+                    "action": "LOG",
+                    "suggestion": "Review",
+                    "source": "builtin",
+                }
+            ],
+        }
+        (d / "generic.json").write_text(json.dumps(data), encoding="utf-8")
         return d
 
     def test_strip_comments(self, monkeypatch):
@@ -41,14 +49,14 @@ class TestRuleSelector:
     def test_load_and_cache(self, tmp_rules, monkeypatch):
         monkeypatch.setattr(rule_selector, "Observer", MagicMock())
         sel = rule_selector.RuleSelector(rules_dir=tmp_rules)
-        rules = sel.load("other")
+        rules = sel.load("generic")
         assert rules and isinstance(rules[0], Rule)
-        assert sel.load("other") is rules
+        assert sel.load("generic") is rules
 
     def test_search(self, tmp_rules, monkeypatch):
         monkeypatch.setattr(rule_selector, "Observer", MagicMock())
         sel = rule_selector.RuleSelector(rules_dir=tmp_rules)
-        results = sel.search("other", "foo")
+        results = sel.search("generic", "foo")
         assert results[0].description == "Must say foo"
 
     def test_validate_errors(self, tmp_rules, monkeypatch):

@@ -9,7 +9,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer as WatchdogObserver
@@ -143,7 +143,9 @@ class RuleSelector:
                 )
                 continue
             if "domain" not in entry:
-                entry["domain"] = ComplianceDomain.OTHER
+                entry["domain"] = domain
+            if "category" not in entry:
+                entry["category"] = "generic" if domain == "generic" else "domain"
             try:
                 rule = Rule.from_dict(entry)
                 rules.append(rule)
@@ -198,6 +200,37 @@ class RuleSelector:
         return results
 
     # ------------------------------------------------------------
+    def aggregate(
+        self, domains: List[str], user_rules: Optional[List[Rule]] = None
+    ) -> Tuple[List[Rule], str]:
+        """Return combined rules for ``domains`` plus generics and users."""
+
+        all_rules: List[Rule] = []
+        versions: List[str] = []
+        try:
+            generics = self.load("generic")
+            all_rules.extend(generics)
+            versions.append(self.get_version("generic"))
+        except RuleLoadError:
+            LOGGER.info("No generic rule file found")
+        for dom in domains:
+            try:
+                dom_rules = self.load(dom)
+                all_rules.extend(dom_rules)
+                versions.append(self.get_version(dom))
+            except RuleLoadError:
+                LOGGER.warning("No rules for domain %s", dom)
+        max_index = max((r.index for r in all_rules), default=0)
+        if user_rules:
+            for i, r in enumerate(user_rules, start=max_index + 1):
+                r.index = i
+                r.category = "user"
+                r.source = "user"
+                all_rules.append(r)
+        rulebase_version = "|".join(versions) or "0.0.0"
+        return all_rules, rulebase_version
+
+    # ------------------------------------------------------------
     def validate(self, domain: str) -> List[str]:
         """Validate rules for a domain and return error messages."""
         path = self.rules_dir / f"{domain}.json"
@@ -220,7 +253,9 @@ class RuleSelector:
                 errors.append(f"Entry {idx} is not an object")
                 continue
             if "domain" not in entry:
-                entry["domain"] = ComplianceDomain.OTHER
+                entry["domain"] = domain
+            if "category" not in entry:
+                entry["category"] = "generic" if domain == "generic" else "domain"
             try:
                 Rule.from_dict(entry)
             except ValueError as exc:
