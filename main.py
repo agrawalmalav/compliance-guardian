@@ -37,6 +37,16 @@ app = typer.Typer(help="Run compliance pipeline on prompts")
 # ---------------------------------------------------------------------------
 
 
+def _format_block(entry: AuditLogEntry) -> str:
+    """Build a user facing message for a blocked request."""
+
+    reason = entry.justification or "Request violates policy"
+    reference = f" (Reference: {entry.legal_reference})" if entry.legal_reference else ""
+    return f"Request blocked by rule {entry.rule_id}: {reason}{reference}"
+
+# ---------------------------------------------------------------------------
+
+
 def _load_batch(file_path: Path) -> List[str]:
     """Load prompts from ``file_path``.
 
@@ -129,8 +139,8 @@ def run_pipeline(
         LOGGER.warning(
             "Prompt violation %s with action BLOCK", first.rule_id
         )
-        suggestion = first.suggested_fix or ""
-        return suggestion, "block", entries
+        message = _format_block(first)
+        return message, "block", entries
 
     # --- Plan generation ---
     start = time.time()
@@ -166,8 +176,8 @@ def run_pipeline(
     if block_entries:
         first = block_entries[0]
         LOGGER.warning("Plan violation %s with action BLOCK", first.rule_id)
-        suggestion = first.suggested_fix or ""
-        return suggestion, "block", entries
+        message = _format_block(first)
+        return message, "block", entries
     LOGGER.info("Plan approved for execution")
 
     # --- Execution ---
@@ -188,10 +198,15 @@ def run_pipeline(
     for entry in out_entries:
         log_decision(entry)
     entries.extend(out_entries)
-
     final_action = "allow"
     if not allowed_out:
         final_action = "block"
+        first = out_entries[0] if out_entries else None
+        message = _format_block(first) if first else "Request blocked"
+        report_path = "iso_eu_mapping.md"
+        log_session_report(entries, report_path)
+        LOGGER.info("Pipeline finished with action=%s", final_action)
+        return message, final_action, entries
 
     # --- Governance mapping ---
     report_path = "iso_eu_mapping.md"
@@ -251,7 +266,9 @@ def run(
             continue
 
         typer.echo(f"Action: {action}")
-        if output:
+        if action == "block":
+            typer.echo(f"Reason: {output}")
+        elif output:
             typer.echo(f"Output snippet: {output[:60]}")
 
     typer.echo("\nCompliance log written to logs/audit_log.jsonl")

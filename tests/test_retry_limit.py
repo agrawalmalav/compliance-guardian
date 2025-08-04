@@ -40,3 +40,35 @@ def test_run_pipeline_no_retry(monkeypatch):
 
     assert action == "block"
     assert calls["count"] == 1
+
+
+def test_run_pipeline_prompt_block(monkeypatch):
+    """Ensure prompt violations stop the pipeline immediately."""
+
+    def fake_extract(prompt, llm=None):
+        return [], []
+
+    class FakeSelector:
+        def aggregate(self, domains, user_rules):
+            return [], "v1"
+
+    def fake_check_prompt(prompt, rules, ver, llm=None):
+        entry = AuditLogEntry(
+            rule_id="B", severity="high", action="BLOCK", input_text=prompt,
+            justification="blocked", session_id="S", legal_reference="L1"
+        )
+        return False, [entry]
+
+    def fail_generate_plan(*args, **kwargs):  # pragma: no cover
+        raise AssertionError("generate_plan should not run")
+
+    monkeypatch.setattr(main.joint_extractor, "extract", fake_extract)
+    monkeypatch.setattr(main.rule_selector, "RuleSelector", lambda: FakeSelector())
+    monkeypatch.setattr(main.compliance_agent, "check_prompt", fake_check_prompt)
+    monkeypatch.setattr(main.primary_agent, "generate_plan", fail_generate_plan)
+    monkeypatch.setattr(main, "log_decision", lambda e: None)
+
+    msg, action, _ = main.run_pipeline("bad", "sess")
+
+    assert action == "block"
+    assert "B" in msg and "blocked" in msg
