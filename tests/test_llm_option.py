@@ -44,6 +44,6 @@ def test_run_pipeline_llm_selection(monkeypatch):
     monkeypatch.setattr(main.compliance_agent, "post_output_check", fake_post)
     monkeypatch.setattr(main.rule_selector, "RuleSelector", lambda: DummySelector())
 
-    out, action, _ = main.run_pipeline("prompt", "sess", interactive=False, llm="openai")
+    out, action, _ = main.run_pipeline("prompt", "sess", llm="openai")
     assert out == "done"
     assert action == "allow"

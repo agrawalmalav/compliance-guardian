@@ -37,7 +37,7 @@ def evaluate(seed: int = 42) -> Tuple[float, float, float]:
 
     for sc in track(scenarios, description="Evaluating"):
         _, action, entries = run_pipeline(
-            sc["prompt"], f"eval-{sc['id']}", interactive=False
+            sc["prompt"], f"eval-{sc['id']}"
         )
         results.append((sc["expected_action"], action))
         all_entries.extend(entries)

@@ -12,18 +12,6 @@ class TestOutputValidator:
     """Validate output against rules with mocked LLM."""
 
     @pytest.fixture()
-    def regex_rule(self):
-        return models.Rule.model_construct(
-            rule_id="R",
-            description="secret",
-            type=models.RuleType.REGEX,
-            severity="high",
-            domain="other",
-            pattern="secret",
-            action="BLOCK",
-        )
-
-    @pytest.fixture()
     def llm_rule(self):
         return models.Rule.model_construct(
             rule_id="L",
@@ -33,13 +21,6 @@ class TestOutputValidator:
             domain="other",
             action="BLOCK",
         )
-
-    def test_regex_rule_detection(self, regex_rule):
-        ok, entries = output_validator.validate_output(
-            "this has secret", [regex_rule], "v1"
-        )
-        assert not ok and entries
-        assert entries[0].action == "BLOCK"
 
     def test_llm_rule(self, llm_rule):
         with patch.object(
@@ -59,7 +40,11 @@ class TestOutputValidator:
         assert output_validator._severity_action(
             models.SeverityLevel.LOW) == "LOG"
 
-    def test_validate_output_no_issues(self, regex_rule):
-        ok, entries = output_validator.validate_output(
-            "clean", [regex_rule], "v1")
-        assert ok and not entries
+    def test_validate_output_no_issues(self, llm_rule):
+        with patch.object(
+            output_validator, "_call_llm", return_value="all good"
+        ):
+            ok, entries = output_validator.validate_output(
+                "clean", [llm_rule], "v1"
+            )
+            assert ok and not entries

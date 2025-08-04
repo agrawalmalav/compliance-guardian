@@ -34,9 +34,15 @@ logging.basicConfig(level=logging.INFO)
 
 app = typer.Typer(help="Run compliance pipeline on prompts")
 
-# Maximum number of times the pipeline will attempt to regenerate a plan
-# after a blocked plan before giving up.
-MAX_RETRIES = 3
+# ---------------------------------------------------------------------------
+
+
+def _format_block(entry: AuditLogEntry) -> str:
+    """Build a user facing message for a blocked request."""
+
+    reason = entry.justification or "Request violates policy"
+    reference = f" (Reference: {entry.legal_reference})" if entry.legal_reference else ""
+    return f"Request blocked by rule {entry.rule_id}: {reason}{reference}"
 
 # ---------------------------------------------------------------------------
 
@@ -64,23 +70,12 @@ def _load_batch(file_path: Path) -> List[str]:
 # ---------------------------------------------------------------------------
 
 
-def _prompt_yes(question: str) -> bool:
-    """Return ``True`` if user answers yes."""
-
-    return input(f"{question} [y/N]: ").strip().lower() == "y"
-
-
-# ---------------------------------------------------------------------------
-
-
 def run_pipeline(
     prompt: str,
     session_id: str,
     *,
-    interactive: bool = True,
     llm: Optional[str] = None,
     selector: Optional[rule_selector.RuleSelector] = None,
-    retry_count: int = 0,
 ) -> Tuple[str, str, List[AuditLogEntry]]:
     """Run the end-to-end compliance pipeline for ``prompt``.
 
@@ -90,20 +85,15 @@ def run_pipeline(
         User provided text to process.
     session_id:
         Identifier to tag audit log entries with.
-    interactive:
-        When ``True`` ask the user how to proceed on warnings or blocks.
     llm:
         Optional identifier for the LLM provider.
     selector:
-        Optional :class:`RuleSelector` to reuse across retries or prompts.
-    retry_count:
-        Internal counter tracking how many times plan generation has been
-        retried after a block.
+        Optional :class:`RuleSelector` to reuse across prompts.
 
     Returns
     -------
     Tuple[str, str, List[AuditLogEntry]]
-        Output text, final action (``allow``, ``warn`` or ``block``) and audit
+        Output text, final action (``allow`` or ``block``) and audit
         entries created.
     """
 
@@ -134,10 +124,27 @@ def run_pipeline(
     selector = selector or rule_selector.RuleSelector()
     rules, rulebase_ver = selector.aggregate(domains, user_rules)
     LOGGER.info("Loaded %d total rules", len(rules))
+    block_rules = [r for r in rules if r.action == "BLOCK"]
+    warn_rules = [r for r in rules if r.action == "WARN"]
+
+    # --- Prompt pre-check ---
+    allowed_prompt, prompt_entries = compliance_agent.check_prompt(
+        prompt, block_rules, rulebase_ver, llm=llm
+    )
+    for entry in prompt_entries:
+        log_decision(entry)
+    entries.extend(prompt_entries)
+    if not allowed_prompt:
+        first = prompt_entries[0]
+        LOGGER.warning(
+            "Prompt violation %s with action BLOCK", first.rule_id
+        )
+        message = _format_block(first)
+        return message, "block", entries
 
     # --- Plan generation ---
     start = time.time()
-    injections = [r.llm_instruction for r in rules if r.llm_instruction]
+    injections = [r.llm_instruction for r in warn_rules if r.llm_instruction]
     plan = primary_agent.generate_plan(prompt, domains, injections, llm=llm)
     duration = time.time() - start
     LOGGER.info("Generated plan in %.2fs", duration)
@@ -160,70 +167,46 @@ def run_pipeline(
 
     # --- Pre-execution compliance check ---
     allowed, plan_entries = compliance_agent.check_plan(
-        plan, rules, rulebase_ver, llm=llm
+        plan, block_rules, rulebase_ver, llm=llm
     )
     for entry in plan_entries:
         log_decision(entry)
     entries.extend(plan_entries)
     block_entries = [e for e in plan_entries if e.action == "BLOCK"]
-    warn_entries = [e for e in plan_entries if e.action == "WARN"]
     if block_entries:
         first = block_entries[0]
         LOGGER.warning("Plan violation %s with action BLOCK", first.rule_id)
-        if interactive and _prompt_yes("Plan blocked. Generate new plan?"):
-            if retry_count >= MAX_RETRIES:
-                typer.echo(
-                    "Plan generation failed after multiple attempts."
-                )
-                LOGGER.error(
-                    "Retry limit of %d reached; aborting", MAX_RETRIES
-                )
-                return "", "block", entries
-            return run_pipeline(
-                prompt,
-                session_id,
-                interactive=interactive,
-                llm=llm,
-                selector=selector,
-                retry_count=retry_count + 1,
-            )
-
-        return "", "block", entries
-    if warn_entries:
-        summary = ", ".join(
-            f"{w.rule_index}:{w.justification}" for w in warn_entries
-        )
-        LOGGER.warning("Warnings: %s", summary)
-        proceed = True
-        if interactive:
-            proceed = _prompt_yes("Warnings detected. Continue?")
-        if not proceed:
-            return "", "warn", entries
-    else:
-        LOGGER.info("Plan approved for execution")
+        message = _format_block(first)
+        return message, "block", entries
+    LOGGER.info("Plan approved for execution")
 
     # --- Execution ---
     start = time.time()
-    output = primary_agent.execute_task(plan, rules, approved=True, llm=llm)
+    output = primary_agent.execute_task(
+        plan, block_rules + warn_rules, approved=True, llm=llm
+    )
     exec_duration = time.time() - start
     LOGGER.info("Executed plan in %.2fs", exec_duration)
 
     # --- Post-execution validation ---
     allowed_out, out_entries = compliance_agent.post_output_check(
         output,
-        rules,
+        block_rules,
         rulebase_ver,
         llm=llm,
     )
     for entry in out_entries:
         log_decision(entry)
     entries.extend(out_entries)
-
     final_action = "allow"
     if not allowed_out:
         final_action = "block"
-    elif any(e.action == "WARN" for e in out_entries):
-        final_action = "warn"
+        first = out_entries[0] if out_entries else None
+        message = _format_block(first) if first else "Request blocked"
+        report_path = "iso_eu_mapping.md"
+        log_session_report(entries, report_path)
+        LOGGER.info("Pipeline finished with action=%s", final_action)
+        return message, final_action, entries
 
     # --- Governance mapping ---
     report_path = "iso_eu_mapping.md"
@@ -283,7 +266,9 @@ def run(
             continue
 
         typer.echo(f"Action: {action}")
-        if output:
+        if action == "block":
+            typer.echo(f"Reason: {output}")
+        elif output:
             typer.echo(f"Output snippet: {output[:60]}")
 
     typer.echo("\nCompliance log written to logs/audit_log.jsonl")

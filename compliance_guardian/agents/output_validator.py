@@ -13,7 +13,6 @@ __version__ = "0.2.1"
 
 import logging
 import os
-import re
 from typing import List, Tuple, Optional
 
 from compliance_guardian.utils.models import (
@@ -76,38 +75,16 @@ def _risk_from_severity(sev: SeverityLevel) -> float:
 # ---------------------------------------------------------------------------
 
 
-def _check_rule(text: str, rule: Rule, rulebase_version: str, llm: Optional[str]) -> AuditLogEntry | None:
+def _check_rule(
+    text: str, rule: Rule, rulebase_version: str, llm: Optional[str]
+) -> AuditLogEntry | None:
     """Check ``text`` against ``rule`` and return an audit entry if needed."""
 
     LOGGER.debug("Validating rule %s", rule.rule_id)
     try:
-        if rule.type == RuleType.REGEX and rule.pattern:
-            if re.search(rule.pattern, text, flags=re.IGNORECASE):
-                reason = f"Matched pattern '{rule.pattern}'"
-                return AuditLogEntry(
-                    rule_id=rule.rule_id,
-                    severity=rule.severity,
-                    action=rule.action,
-                    input_text=text,
-                    justification=reason,
-                    suggested_fix=rule.suggestion,
-                    clause_id=None,
-                    risk_score=_risk_from_severity(rule.severity),
-                    session_id="validation-session",
-                    agent_stack=[__name__],
-                    rule_version=rule.version,
-                    agent_versions={__name__: __version__},
-                    rulebase_version=rulebase_version,
-                    execution_time=None,
-                    rule_index=rule.index,
-                    category=rule.category,
-                    source=rule.source,
-                    legal_reference=rule.legal_reference,
-                )
-        elif rule.type in {RuleType.SEMANTIC, RuleType.LLM}:
+        if rule.type in {RuleType.SEMANTIC, RuleType.LLM}:
             prompt = rule.llm_instruction or (
-                f"Does the following text violate this rule: {
-                    rule.description}? Explain.\n\n{text}"
+                f"Does the following text violate this rule: {rule.description}? Explain.\n\n{text}"
             )
             response = _call_llm(prompt, llm)
             if any(w in response.lower() for w in ("yes", "violation", "block")):

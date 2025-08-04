@@ -2,7 +2,7 @@ import main
 from compliance_guardian.utils.models import AuditLogEntry
 
 
-def test_run_pipeline_retry_limit(monkeypatch):
+def test_run_pipeline_no_retry(monkeypatch):
     calls = {"count": 0}
 
     def fake_extract(prompt, llm=None):
@@ -34,10 +34,41 @@ def test_run_pipeline_retry_limit(monkeypatch):
     monkeypatch.setattr(main.rule_selector, "RuleSelector", lambda: FakeSelector())
     monkeypatch.setattr(main.primary_agent, "generate_plan", fake_generate_plan)
     monkeypatch.setattr(main.compliance_agent, "check_plan", fake_check_plan)
-    monkeypatch.setattr(main, "_prompt_yes", lambda q: True)
     monkeypatch.setattr(main, "log_decision", lambda e: None)
 
     _, action, _ = main.run_pipeline("prompt", "sess")
 
     assert action == "block"
-    assert calls["count"] == main.MAX_RETRIES + 1
+    assert calls["count"] == 1
+
+
+def test_run_pipeline_prompt_block(monkeypatch):
+    """Ensure prompt violations stop the pipeline immediately."""
+
+    def fake_extract(prompt, llm=None):
+        return [], []
+
+    class FakeSelector:
+        def aggregate(self, domains, user_rules):
+            return [], "v1"
+
+    def fake_check_prompt(prompt, rules, ver, llm=None):
+        entry = AuditLogEntry(
+            rule_id="B", severity="high", action="BLOCK", input_text=prompt,
+            justification="blocked", session_id="S", legal_reference="L1"
+        )
+        return False, [entry]
+
+    def fail_generate_plan(*args, **kwargs):  # pragma: no cover
+        raise AssertionError("generate_plan should not run")
+
+    monkeypatch.setattr(main.joint_extractor, "extract", fake_extract)
+    monkeypatch.setattr(main.rule_selector, "RuleSelector", lambda: FakeSelector())
+    monkeypatch.setattr(main.compliance_agent, "check_prompt", fake_check_prompt)
+    monkeypatch.setattr(main.primary_agent, "generate_plan", fail_generate_plan)
+    monkeypatch.setattr(main, "log_decision", lambda e: None)
+
+    msg, action, _ = main.run_pipeline("bad", "sess")
+
+    assert action == "block"
+    assert "B" in msg and "blocked" in msg
