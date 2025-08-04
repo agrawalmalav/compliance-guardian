@@ -22,7 +22,7 @@ class TestEvaluation:
         scenarios = [{"id": 1, "prompt": "hi", "expected_action": "warn"}]
         monkeypatch.setattr(eval_module, "load_scenarios", lambda: scenarios)
 
-        def fake_run(prompt, sid, interactive=True):
+        def fake_run(prompt, sid):
             entry = AuditLogEntry(
                 rule_id="R",
                 severity="medium",

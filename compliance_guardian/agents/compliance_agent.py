@@ -15,7 +15,6 @@ __version__ = "0.2.1"
 
 import logging
 import os
-import re
 from typing import List, Optional, Tuple
 
 from compliance_guardian.utils.models import (
@@ -134,14 +133,7 @@ def _check_text_against_rule(
     LOGGER.debug("Checking rule %s of type %s", rule.rule_id, rule.type)
 
     try:
-        if rule.type == RuleType.REGEX and rule.pattern:
-            if re.search(rule.pattern, text, flags=re.IGNORECASE):
-                reason = f"Pattern '{rule.pattern}' matched"
-                LOGGER.info("Regex violation for rule %s", rule.rule_id)
-                return _build_audit_entry(
-                    rule, text, reason, rulebase_version=rulebase_version
-                )
-        elif rule.type == RuleType.SEMANTIC:
+        if rule.type == RuleType.SEMANTIC:
             prompt = (
                 "Does the following plan violate this rule: "
                 f"{rule.description}? Explain.\n\n{text}"
@@ -168,6 +160,33 @@ def _check_text_against_rule(
             rulebase_version=rulebase_version,
         )
     return None
+
+
+# ---------------------------------------------------------------------------
+
+
+def check_prompt(
+    prompt: str,
+    rules: List[Rule],
+    rulebase_version: str,
+    llm: Optional[str] = None,
+) -> Tuple[bool, List[AuditLogEntry]]:
+    """Validate the user ``prompt`` against compliance ``rules``."""
+
+    LOGGER.info("Checking prompt with %d rules", len(rules))
+    entries: List[AuditLogEntry] = []
+    allowed = True
+    for rule in rules:
+        entry = _check_text_against_rule(prompt, rule, rulebase_version, llm)
+        if entry:
+            entries.append(entry)
+            if entry.action == "BLOCK":
+                allowed = False
+    if entries:
+        LOGGER.debug("Prompt triggered %d rule checks", len(entries))
+    else:
+        LOGGER.info("Prompt passed compliance checks")
+    return allowed, entries
 
 
 # ---------------------------------------------------------------------------

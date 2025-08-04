@@ -2,7 +2,7 @@ import main
 from compliance_guardian.utils.models import AuditLogEntry
 
 
-def test_run_pipeline_retry_limit(monkeypatch):
+def test_run_pipeline_no_retry(monkeypatch):
     calls = {"count": 0}
 
     def fake_extract(prompt, llm=None):
@@ -34,10 +34,9 @@ def test_run_pipeline_retry_limit(monkeypatch):
     monkeypatch.setattr(main.rule_selector, "RuleSelector", lambda: FakeSelector())
     monkeypatch.setattr(main.primary_agent, "generate_plan", fake_generate_plan)
     monkeypatch.setattr(main.compliance_agent, "check_plan", fake_check_plan)
-    monkeypatch.setattr(main, "_prompt_yes", lambda q: True)
     monkeypatch.setattr(main, "log_decision", lambda e: None)
 
     _, action, _ = main.run_pipeline("prompt", "sess")
 
     assert action == "block"
-    assert calls["count"] == main.MAX_RETRIES + 1
+    assert calls["count"] == 1
