@@ -10,7 +10,7 @@ class TestRiskScorer:
         return models.Rule.model_construct(
             rule_id="R1",
             description="desc",
-            type=models.RuleType.REGEX,
+            type=models.RuleType.LLM,
             severity=severity,
             domain="finance",
         )

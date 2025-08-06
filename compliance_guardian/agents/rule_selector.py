@@ -21,7 +21,7 @@ else:  # pragma: no cover
     Observer = WatchdogObserver
 import typer
 
-from compliance_guardian.utils.models import Rule, RuleSummary, ComplianceDomain
+from compliance_guardian.utils.models import Rule, RuleSummary
 
 
 LOGGER = logging.getLogger(__name__)
@@ -284,12 +284,9 @@ class RuleSelector:
                 versions.append(self.get_version(dom))
             except RuleLoadError:
                 LOGGER.warning("No rules for domain %s", dom)
-        max_index = max((r.index for r in all_rules), default=0)
         if user_rules:
-            for i, r in enumerate(user_rules, start=max_index + 1):
-                r.index = i
+            for r in user_rules:
                 r.category = "user"
-                r.source = "user"
                 all_rules.append(r)
         rulebase_version = "|".join(versions) or "0.0.0"
         return all_rules, rulebase_version

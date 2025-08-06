@@ -13,21 +13,27 @@ class TestOutputValidator:
 
     @pytest.fixture()
     def llm_rule(self):
-        return models.Rule.model_construct(
+        rule = models.Rule.model_construct(
             rule_id="L",
             description="avoid bad",
-            type=models.RuleType.SEMANTIC,
+            type=models.RuleType.LLM,
             severity="high",
             domain="other",
             action="BLOCK",
         )
+        summary = models.RuleSummary(
+            rule_id="L", description="avoid bad", action="BLOCK"
+        )
+        return rule, summary
 
     def test_llm_rule(self, llm_rule):
+        rule, summary = llm_rule
+        lookup = {rule.rule_id: rule}
         with patch.object(
             output_validator, "_call_llm", return_value="Yes violation"
         ):
             ok, entries = output_validator.validate_output(
-                "text", [llm_rule], "v1"
+                "text", [summary], lookup, "v1"
             )
             assert not ok
             assert entries[0].action == "BLOCK"
@@ -41,10 +47,12 @@ class TestOutputValidator:
             models.SeverityLevel.LOW) == "LOG"
 
     def test_validate_output_no_issues(self, llm_rule):
+        rule, summary = llm_rule
+        lookup = {rule.rule_id: rule}
         with patch.object(
             output_validator, "_call_llm", return_value="all good"
         ):
             ok, entries = output_validator.validate_output(
-                "clean", [llm_rule], "v1"
+                "clean", [summary], lookup, "v1"
             )
             assert ok and not entries

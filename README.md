@@ -104,9 +104,17 @@ The resulting file is written to `exports/appendix_export.tex`.
 
 Rule files live in `compliance_guardian/config/rules/DOMAIN.json`. Each rule
 follows the schema defined in `utils/models.py`. Add a new JSON file for a new
-domain and the `RuleSelector` will pick it up automatically. Use
-`python -m compliance_guardian.utils.legal_to_json` to convert legal clauses
-into structured rules.
+domain and the `RuleSelector` will pick it up automatically. The lightweight
+summary files in `config/rules_summary` are generated automatically from the
+full definitions using:
+
+```bash
+python scripts/generate_rules_summary.py
+```
+
+Summary files contain only `rule_id`, a concise `description`, and the
+prescribed `action` so the LLM context stays slim. The full rule files retain
+legal references and concrete suggestions for user feedback.
 
 ## External Datasets and Legal References
 

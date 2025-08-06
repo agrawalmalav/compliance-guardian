@@ -23,15 +23,12 @@ class TestRuleSelector:
                 {
                     "rule_id": "T1",
                     "description": "Must say foo",
-                    "type": "REGEX",
+                    "type": "LLM",
                     "severity": "low",
-                    "pattern": "foo",
                     "domain": "generic",
-                    "index": 1,
                     "category": "generic",
                     "action": "LOG",
-                    "suggestion": "Review",
-                    "source": "builtin",
+                    "suggestion": "Use foo politely",
                 }
             ],
         }
@@ -77,12 +74,9 @@ class TestRuleSelector:
         monkeypatch.setattr(rule_selector, "Observer", MagicMock())
         prompt_dir = tmp_rules.parent / "prompts"
         prompt_dir.mkdir()
-        data = {
-            "version": "1.0.0",
-            "rules": [
-                {"rule_id": "T1", "description": "Must say foo", "pattern": "foo"}
-            ],
-        }
+        data = [
+            {"rule_id": "T1", "description": "Must say foo", "action": "LOG"}
+        ]
         (prompt_dir / "generic.json").write_text(
             json.dumps(data), encoding="utf-8"
         )
@@ -93,4 +87,4 @@ class TestRuleSelector:
         assert isinstance(prompts[0], RuleSummary)
         assert prompts[0].description == "Must say foo"
         full = sel.get_rule("generic", "T1")
-        assert full and full.pattern == "foo"
+        assert full and full.description == "Must say foo"

@@ -21,8 +21,6 @@ Example:
     ...     type=RuleType.SECURITY,
     ...     severity=SeverityLevel.HIGH,
     ...     domain=ComplianceDomain.GDPR,
-    ...     pattern=r"\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b",
-    ...     keywords=["email"],
     ... )
     >>> rule_dict = rule.to_dict()
 """
@@ -75,8 +73,6 @@ class Rule(BaseModel):
         type: Category of the rule.
         severity: Impact severity if violated.
         domain: Compliance domain to which this rule belongs.
-        pattern: Optional regex pattern used for detection.
-        keywords: Keywords associated with the rule.
         llm_instruction: Instruction for an LLM to comply with this rule.
         clause_mapping: Mapping of clause identifiers to text references.
         legal_reference: Optional legal citation linked to the rule.
@@ -84,25 +80,15 @@ class Rule(BaseModel):
     """
 
     rule_id: str = Field(..., description="Unique identifier for this rule.")
-    version: str = Field(
-        "1.0.0",
-        description=(
-            "Version identifier for this rule allowing full traceability"
-        ),
+    description: str = Field(
+        ..., description="Human-readable rule description."
     )
-    description: str = Field(...,
-                             description="Human-readable rule description.")
     type: RuleType = Field(..., description="Category of the rule.")
-    severity: SeverityLevel = Field(...,
-                                    description="Impact severity if violated.")
+    severity: SeverityLevel = Field(
+        ..., description="Impact severity if violated."
+    )
     domain: ComplianceDomain = Field(
         ..., description="Compliance domain to which this rule belongs."
-    )
-    pattern: Optional[str] = Field(
-        None, description="Regex pattern used to detect rule violations."
-    )
-    keywords: List[str] = Field(
-        default_factory=list, description="Keywords associated with the rule."
     )
     llm_instruction: Optional[str] = Field(
         None, description="Instruction for an LLM to comply with this rule."
@@ -117,9 +103,6 @@ class Rule(BaseModel):
     example_violation: Optional[str] = Field(
         None, description="Example text that violates the rule."
     )
-    index: int = Field(
-        0, description="Unique integer index for fast lookup/logging."
-    )
     category: str = Field(
         "generic", description="Rule category: generic, domain or user."
     )
@@ -129,9 +112,6 @@ class Rule(BaseModel):
     suggestion: Optional[str] = Field(
         None,
         description="Suggested alternative if the rule blocks execution."
-    )
-    source: str = Field(
-        "builtin", description="Origin of the rule: builtin or user."
     )
 
     @classmethod
@@ -181,8 +161,6 @@ class Rule(BaseModel):
                 else:
                     data["action"] = "LOG"
             data.setdefault("category", "generic")
-            data.setdefault("source", "builtin")
-            data.setdefault("index", 0)
             return cls(**data)
         except ValidationError as exc:
             raise ValueError(f"Invalid Rule data: {exc}") from exc
@@ -201,7 +179,7 @@ class RuleSummary(BaseModel):
 
     rule_id: str
     description: Optional[str] = None
-    pattern: Optional[str] = None
+    action: str = "LOG"
 
 
 class AuditLogEntry(BaseModel):
@@ -267,14 +245,8 @@ class AuditLogEntry(BaseModel):
     execution_time: Optional[float] = Field(
         None, description="Time taken to execute in seconds."
     )
-    rule_index: Optional[int] = Field(
-        None, description="Unique index assigned to the rule."
-    )
     category: Optional[str] = Field(
         None, description="Rule category triggering the entry."
-    )
-    source: Optional[str] = Field(
-        None, description="Rule source (builtin or user)."
     )
     legal_reference: Optional[str] = Field(
         None, description="Legal reference associated with the rule."

@@ -17,7 +17,6 @@ import os
 import re
 from typing import List, Tuple, Optional
 
-
 from compliance_guardian.utils.models import (
     Rule,
     RuleType,
@@ -57,7 +56,6 @@ def _llm_extract(prompt: str, llm: Optional[str]) -> Tuple[List[str], List[Rule]
         Preferred LLM provider (``"openai"`` or ``"gemini"``). ``None`` uses the
         first available provider.
     """
-
 
     system = (
         "Classify the prompt into domains (scraping, finance, medical, other) "
@@ -111,15 +109,12 @@ def _build_user_rule(idx: int, text: str) -> Rule:
         type=RuleType.PROCEDURAL,
         severity=SeverityLevel.HIGH,
         domain=ComplianceDomain.OTHER,
-        pattern=None,
         llm_instruction=text,
         legal_reference=None,
         example_violation=None,
-        index=0,
         category="user",
         action="BLOCK",
-        suggestion="Comply with explicit user instruction.",
-        source="user",
+        suggestion="Follow the user instruction as written.",
     )
 
 

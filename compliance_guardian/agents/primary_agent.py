@@ -39,10 +39,8 @@ except Exception:  # pragma: no cover - optional dependency
 
 from compliance_guardian.utils.models import (
     PlanSummary,
-    Rule,
+    RuleSummary,
     ComplianceDomain,
-    RuleType,
-    SeverityLevel,
 )
 from compliance_guardian.utils.text import _strip_code_fence
 
@@ -163,7 +161,7 @@ def generate_plan(
 
 def execute_task(
     plan: PlanSummary,
-    rules: List[Rule],
+    rules: List[RuleSummary],
     approved: bool,
     llm: Optional[str] = None,
 ) -> str:
@@ -187,7 +185,7 @@ def execute_task(
         LOGGER.warning("Execution aborted: plan not approved")
         return "Execution aborted: plan not approved"
 
-    rule_lines = [f"({r.rule_id}) {r.llm_instruction or r.description}" for r in rules]
+    rule_lines = [f"({r.rule_id}) {r.description}" for r in rules]
     system_rules = "You must comply with the following rules:\n" + "\n".join(rule_lines)
 
     user_steps = (
@@ -225,22 +223,15 @@ def _demo() -> None:
         "other": "Tell me a fun fact about space",
     }
 
-    dummy_rule = Rule(
+    dummy_rule = RuleSummary(
         rule_id="GEN001",
-        version="1.0.0",
         description="Respond politely and keep answers concise.",
-        type=RuleType.PROCEDURAL,
-        severity=SeverityLevel.LOW,
-        domain=ComplianceDomain.OTHER,
-        pattern=None,
-        llm_instruction=None,
-        legal_reference=None,
-        example_violation=None,
+        action="LOG",
     )
 
     for dom, prmpt in samples.items():
         print(f"\n--- Domain: {dom} ---")
-        plan = generate_plan(prmpt, dom)
+        plan = generate_plan(prmpt, [dom], [])
         # ``model_dump_json`` is used for compatibility with Pydantic v2
         print(plan.model_dump_json(indent=2))
         result = execute_task(plan, [dummy_rule], approved=True)

@@ -3,117 +3,83 @@
   "rules": [
     {
       "rule_id": "FIN001",
-      "version": "1.0.0",
-      "description": "Do not expose full account or credit card numbers.",
-      "type": "REGEX",
+      "description": "Never expose full account or credit card numbers.",
+      "type": "LLM",
       "severity": "high",
-      "pattern": "\\b\\d{4}[- ]?\\d{4}[- ]?\\d{4}[- ]?\\d{4}\\b",
-      "keywords": [],
       "llm_instruction": null,
       "clause_mapping": {
         "PCI DSS": "Req. 3"
       },
       "legal_reference": "https://www.pcisecuritystandards.org/",
       "example_violation": "Customer card 1234-5678-9012-3456",
-      "index": 1,
       "category": "domain",
       "domain": "finance",
       "action": "BLOCK",
-      "suggestion": "Review for compliance",
-      "source": "builtin"
+      "suggestion": "Mask all but the last four digits of card numbers."
     },
     {
       "rule_id": "FIN002",
-      "version": "1.0.0",
-      "description": "Avoid misleading guarantees of investment returns.",
-      "type": "SEMANTIC",
+      "description": "Never promise guaranteed investment returns.",
+      "type": "LLM",
       "severity": "medium",
-      "pattern": null,
-      "keywords": [
-        "guaranteed",
-        "risk-free",
-        "no loss"
-      ],
       "llm_instruction": null,
       "clause_mapping": {
         "SEC": "Rule 10b-5"
       },
       "legal_reference": "https://www.sec.gov/rules/final/33-7825.htm",
       "example_violation": "Our fund offers guaranteed 20% returns",
-      "index": 2,
       "category": "domain",
       "domain": "finance",
       "action": "WARN",
-      "suggestion": "Review for compliance",
-      "source": "builtin"
+      "suggestion": "Explain investment risks instead of promising returns."
     },
     {
       "rule_id": "FIN003",
-      "version": "1.0.0",
-      "description": "Require customer consent before sharing financial data with third parties.",
+      "description": "Always obtain explicit customer consent before sharing financial data with third parties.",
       "type": "LLM",
       "severity": "high",
-      "pattern": null,
-      "keywords": [],
       "llm_instruction": "Verify documented consent before any data sharing; otherwise BLOCK the request.",
       "clause_mapping": {
         "GDPR Art. 6": "Lawfulness of processing"
       },
       "legal_reference": "https://gdpr-info.eu/art-6-gdpr/",
       "example_violation": "Sending transaction history to marketing partner",
-      "index": 3,
       "category": "domain",
       "domain": "finance",
       "action": "BLOCK",
-      "suggestion": "Review for compliance",
-      "source": "builtin"
+      "suggestion": "Obtain and record customer consent before data sharing."
     },
     {
       "rule_id": "FIN004",
-      "version": "1.0.0",
-      "description": "Detect text suggesting discriminatory lending or denial based on protected attributes.",
-      "type": "SEMANTIC",
+      "description": "Never make lending decisions based on protected attributes.",
+      "type": "LLM",
       "severity": "high",
-      "pattern": null,
-      "keywords": [
-        "redline",
-        "minority",
-        "race",
-        "gender"
-      ],
       "llm_instruction": null,
       "clause_mapping": {
         "Equal Credit Opportunity": "15 U.S.C. \u00a71691"
       },
       "legal_reference": "https://www.consumerfinance.gov/rules-policy/regulations/1002/",
       "example_violation": "We avoid loans in minority neighborhoods",
-      "index": 4,
       "category": "domain",
       "domain": "finance",
       "action": "BLOCK",
-      "suggestion": "Review for compliance",
-      "source": "builtin"
+      "suggestion": "Base lending decisions on financial criteria only."
     },
     {
       "rule_id": "FIN005",
-      "version": "1.0.0",
-      "description": "Prevent insider trading tips or non-public information disclosures.",
+      "description": "Do not share insider tips or non-public financial information.",
       "type": "LLM",
       "severity": "high",
-      "pattern": null,
-      "keywords": [],
       "llm_instruction": "If text contains non-public financial details intended for trading advantage, BLOCK and log.",
       "clause_mapping": {
         "US Securities": "15 U.S.C. \u00a778j"
       },
       "legal_reference": "https://www.law.cornell.edu/uscode/text/15/78j",
       "example_violation": "Buy shares before earnings announcement tomorrow",
-      "index": 5,
       "category": "domain",
       "domain": "finance",
       "action": "BLOCK",
-      "suggestion": "Review for compliance",
-      "source": "builtin"
+      "suggestion": "Share only information that is already public."
     }
   ]
 }
