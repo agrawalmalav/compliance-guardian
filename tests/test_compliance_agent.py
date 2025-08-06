@@ -98,6 +98,26 @@ class TestComplianceAgent:
             assert not allowed
             assert entries and "violation" in entries[0].justification.lower()
 
+    def test_check_prompt_warn_rule(self):
+        rule = models.Rule.model_construct(
+            rule_id="W",
+            description="no foo",
+            type=models.RuleType.LLM,
+            severity="medium",
+            domain="other",
+            action="WARN",
+        )
+        summary = models.RuleSummary(rule_id="W", description="no foo", action="WARN")
+        lookup = {rule.rule_id: rule}
+        with patch.object(
+            compliance_agent, "_call_llm", return_value="violation found"
+        ):
+            allowed, entries = compliance_agent.check_prompt(
+                "foo", [summary], lookup, "v1"
+            )
+            assert allowed
+            assert entries and entries[0].action == "WARN"
+
     def test_check_plan_llm_failure(self, semantic_rule):
         rule, summary = semantic_rule
         lookup = {rule.rule_id: rule}

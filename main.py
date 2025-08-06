@@ -140,7 +140,7 @@ def run_pipeline(
         for r in user_rules
     )
 
-    block_rules = [s for s in summaries if s.action == "BLOCK"]
+
     warn_rules = [s for s in summaries if s.action == "WARN"]
 
     if warn_rules:
@@ -152,7 +152,8 @@ def run_pipeline(
 
     # --- Prompt pre-check ---
     allowed_prompt, prompt_entries = compliance_agent.check_prompt(
-        prompt, block_rules, rule_lookup, rulebase_ver, llm=llm
+        prompt, summaries, rule_lookup, rulebase_ver, llm=llm
+
     )
     for entry in prompt_entries:
         log_decision(entry)
@@ -168,7 +169,13 @@ def run_pipeline(
 
     # --- Plan generation ---
     start = time.time()
-    injections = [r.llm_instruction for r in warn_rules if r.llm_instruction]
+    injections: List[str] = []
+    for summary in warn_rules:
+        full = rule_lookup.get(summary.rule_id)
+        if full and full.llm_instruction:
+            injections.append(full.llm_instruction)
+        elif summary.description:
+            injections.append(summary.description)
     plan = primary_agent.generate_plan(prompt, domains, injections, llm=llm)
     duration = time.time() - start
     LOGGER.info("Generated plan in %.2fs", duration)
@@ -191,7 +198,8 @@ def run_pipeline(
 
     # --- Pre-execution compliance check ---
     allowed, plan_entries = compliance_agent.check_plan(
-        plan, block_rules, rule_lookup, rulebase_ver, llm=llm
+        plan, summaries, rule_lookup, rulebase_ver, llm=llm
+
     )
     for entry in plan_entries:
         log_decision(entry)
@@ -208,7 +216,7 @@ def run_pipeline(
     # --- Execution ---
     start = time.time()
     output = primary_agent.execute_task(
-        plan, block_rules + warn_rules, approved=True, llm=llm
+        plan, summaries, approved=True, llm=llm
     )
     exec_duration = time.time() - start
     LOGGER.info("Executed plan in %.2fs", exec_duration)
@@ -216,7 +224,7 @@ def run_pipeline(
     # --- Post-execution validation ---
     allowed_out, out_entries = compliance_agent.post_output_check(
         output,
-        block_rules,
+        summaries,
         rule_lookup,
         rulebase_ver,
         llm=llm,
