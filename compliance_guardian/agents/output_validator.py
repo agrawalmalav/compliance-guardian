@@ -13,14 +13,15 @@ __version__ = "0.2.1"
 
 import logging
 import os
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 
 from compliance_guardian.utils.models import (
     AuditLogEntry,
     Rule,
+    RuleSummary,
     SeverityLevel,
-    RuleType,
     ComplianceDomain,
+    RuleType,
 )
 
 try:
@@ -76,40 +77,63 @@ def _risk_from_severity(sev: SeverityLevel) -> float:
 
 
 def _check_rule(
-    text: str, rule: Rule, rulebase_version: str, llm: Optional[str]
+    text: str,
+    rule: RuleSummary,
+    rule_lookup: Dict[str, Rule],
+    rulebase_version: str,
+    llm: Optional[str],
 ) -> AuditLogEntry | None:
     """Check ``text`` against ``rule`` and return an audit entry if needed."""
 
     LOGGER.debug("Validating rule %s", rule.rule_id)
     try:
-        if rule.type in {RuleType.SEMANTIC, RuleType.LLM}:
-            prompt = rule.llm_instruction or (
-                f"Does the following text violate this rule: {rule.description}? Explain.\n\n{text}"
-            )
-            response = _call_llm(prompt, llm)
-            if any(w in response.lower() for w in ("yes", "violation", "block")):
+        prompt = (
+            f"Does the following text violate this rule: {rule.description}? Explain.\n\n{text}"
+        )
+        response = _call_llm(prompt, llm)
+        if any(w in response.lower() for w in ("yes", "violation", "block")):
+            full_rule = rule_lookup.get(rule.rule_id)
+            if full_rule:
                 return AuditLogEntry(
-                    rule_id=rule.rule_id,
-                    severity=rule.severity,
-                    action=rule.action,
+                    rule_id=full_rule.rule_id,
+                    severity=full_rule.severity,
+                    action=full_rule.action,
                     input_text=text,
                     justification=response,
-                    suggested_fix=rule.suggestion,
+                    suggested_fix=full_rule.suggestion,
                     clause_id=None,
-                    risk_score=_risk_from_severity(rule.severity),
+                    risk_score=_risk_from_severity(full_rule.severity),
                     session_id="validation-session",
                     agent_stack=[__name__],
-                    rule_version=rule.version,
+                    rule_version=None,
                     agent_versions={__name__: __version__},
                     rulebase_version=rulebase_version,
                     execution_time=None,
-                    rule_index=rule.index,
-                    category=rule.category,
-                    source=rule.source,
-                    legal_reference=rule.legal_reference,
+                    category=full_rule.category,
+                    legal_reference=full_rule.legal_reference,
                 )
     except Exception as exc:  # pragma: no cover - network/LLM failure
         LOGGER.error("Validation error for rule %s: %s", rule.rule_id, exc)
+        full_rule = rule_lookup.get(rule.rule_id)
+        if full_rule:
+            return AuditLogEntry(
+                rule_id=full_rule.rule_id,
+                severity=full_rule.severity,
+                action=full_rule.action,
+                input_text=text,
+                justification=f"LLM check failed: {exc}",
+                suggested_fix=full_rule.suggestion,
+                clause_id=None,
+                risk_score=_risk_from_severity(full_rule.severity),
+                session_id="validation-session",
+                agent_stack=[__name__],
+                rule_version=None,
+                agent_versions={__name__: __version__},
+                rulebase_version=rulebase_version,
+                execution_time=None,
+                category=full_rule.category,
+                legal_reference=full_rule.legal_reference,
+            )
     return None
 
 
@@ -130,7 +154,11 @@ def _severity_action(sev: SeverityLevel) -> str:
 
 
 def validate_output(
-    output: str, rules: List[Rule], rulebase_version: str, llm: Optional[str] = None
+    output: str,
+    rules: List[RuleSummary],
+    rule_lookup: Dict[str, Rule],
+    rulebase_version: str,
+    llm: Optional[str] = None,
 ) -> Tuple[bool, List[AuditLogEntry]]:
     """Validate ``output`` against a list of ``rules``.
 
@@ -148,7 +176,7 @@ def validate_output(
     entries: List[AuditLogEntry] = []
     allowed = True
     for rule in rules:
-        entry = _check_rule(output, rule, rulebase_version, llm)
+        entry = _check_rule(output, rule, rule_lookup, rulebase_version, llm)
         if entry:
             entries.append(entry)
             if entry.action == "BLOCK":
@@ -168,38 +196,46 @@ if __name__ == "__main__":  # pragma: no cover - manual tests
     test_rules = [
         Rule(
             rule_id="VAL1",
-            version="1.0.0",
             description="Do not reveal passwords",
             type=RuleType.PROCEDURAL,
             severity=SeverityLevel.HIGH,
             domain=ComplianceDomain.OTHER,
-            pattern=r"password\s*[:=]\s*\w+",
             llm_instruction=None,
             legal_reference=None,
             example_violation=None,
+            category="demo",
+            action="BLOCK",
+            suggestion=None,
         ),
         Rule(
             rule_id="VAL2",
-            version="1.0.0",
             description="Avoid defamatory language",
             type=RuleType.PROCEDURAL,
             severity=SeverityLevel.MEDIUM,
             domain=ComplianceDomain.OTHER,
-            pattern=None,
             llm_instruction=None,
             legal_reference=None,
             example_violation=None,
+            category="demo",
+            action="BLOCK",
+            suggestion=None,
         ),
     ]
 
+    summaries = [
+        RuleSummary(rule_id=r.rule_id, description=r.description, action=r.action)
+        for r in test_rules
+    ]
+    lookup = {r.rule_id: r for r in test_rules}
+
     sample_text = "The admin password: hunter2 should never be shared."
-    allowed, logs = validate_output(sample_text, test_rules, "1.0.0")
+    allowed, logs = validate_output(sample_text, summaries, lookup, "1.0.0")
     print("Allowed:", allowed)
     for log in logs:
         print(log.model_dump_json(indent=2))
 
     sample_text2 = "You are an idiot and everyone knows it."
-    allowed2, logs2 = validate_output(sample_text2, test_rules, "1.0.0")
+    allowed2, logs2 = validate_output(sample_text2, summaries, lookup, "1.0.0")
     print("Allowed2:", allowed2)
     for log in logs2:
         print(log.model_dump_json(indent=2))

@@ -3,117 +3,83 @@
   "rules": [
     {
       "rule_id": "SCR001",
-      "version": "1.0.0",
-      "description": "Block collection of email addresses or phone numbers without user consent.",
-      "type": "REGEX",
+      "description": "Do not collect or output email addresses or phone numbers unless explicit user consent is confirmed.",
+      "type": "LLM",
       "severity": "high",
-      "pattern": "(?i)([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})|((?:\\+?\\d{1,3})?\\s?(?:\\(\\d{1,4}\\)|\\d{1,4})?[\\s-]?\\d{3}[\\s-]?\\d{4})",
-      "keywords": [],
       "llm_instruction": null,
       "clause_mapping": {
         "GDPR Art. 6": "Lawfulness of processing"
       },
       "legal_reference": "https://gdpr-info.eu/art-6-gdpr/",
       "example_violation": "Contact us at example@example.com for more info",
-      "index": 1,
       "category": "domain",
       "domain": "scraping",
       "action": "BLOCK",
-      "suggestion": "Review for compliance",
-      "source": "builtin"
+      "suggestion": "Ask users to provide contact details via a consent form instead of scraping."
     },
     {
       "rule_id": "SCR002",
-      "version": "1.0.0",
-      "description": "Respect robots.txt and meta tags prohibiting scraping.",
-      "type": "SEMANTIC",
+      "description": "Always respect robots.txt and meta tags that prohibit scraping.",
+      "type": "LLM",
       "severity": "medium",
-      "pattern": null,
-      "keywords": [
-        "robots",
-        "disallow",
-        "noindex",
-        "nofollow"
-      ],
       "llm_instruction": null,
       "clause_mapping": {
         "EU ePrivacy": "Directive 2002/58/EC"
       },
       "legal_reference": "https://eur-lex.europa.eu/eli/dir/2002/58/oj",
       "example_violation": "Robots.txt contains 'Disallow: /private' but scraper ignores it",
-      "index": 2,
       "category": "domain",
       "domain": "scraping",
       "action": "WARN",
-      "suggestion": "Review for compliance",
-      "source": "builtin"
+      "suggestion": "Check and honor robots.txt and noindex/nofollow tags before scraping."
     },
     {
       "rule_id": "SCR003",
-      "version": "1.0.0",
-      "description": "Ensure explicit consent before scraping social media profiles.",
+      "description": "Never scrape social media profiles without explicit user consent.",
       "type": "LLM",
       "severity": "high",
-      "pattern": null,
-      "keywords": [],
       "llm_instruction": "If user consent is missing, do not scrape social network data and report a BLOCK.",
       "clause_mapping": {
         "GDPR Art. 7": "Conditions for consent"
       },
       "legal_reference": "https://gdpr-info.eu/art-7-gdpr/",
       "example_violation": "Scraping friends list without consent",
-      "index": 3,
       "category": "domain",
       "domain": "scraping",
       "action": "BLOCK",
-      "suggestion": "Review for compliance",
-      "source": "builtin"
+      "suggestion": "Request and document consent from account holders before collecting profile data."
     },
     {
       "rule_id": "SCR004",
-      "version": "1.0.0",
-      "description": "Avoid scraping text marked with copyright notices or 'all rights reserved'.",
-      "type": "REGEX",
+      "description": "Do not scrape content marked with copyright notices or 'all rights reserved'.",
+      "type": "LLM",
       "severity": "high",
-      "pattern": "(?i)(\u00a9|\\ball rights reserved\\b)",
-      "keywords": [],
       "llm_instruction": null,
       "clause_mapping": {
         "EU Copyright": "Directive 2001/29/EC"
       },
       "legal_reference": "https://eur-lex.europa.eu/eli/dir/2001/29/oj",
       "example_violation": "Downloading article with \u00a9 2024 Example Corp",
-      "index": 4,
       "category": "domain",
       "domain": "scraping",
       "action": "BLOCK",
-      "suggestion": "Review for compliance",
-      "source": "builtin"
+      "suggestion": "Use content that is explicitly licensed for reuse."
     },
     {
       "rule_id": "SCR005",
-      "version": "1.0.0",
       "description": "Do not circumvent paywalls or authentication mechanisms while scraping.",
-      "type": "SEMANTIC",
+      "type": "LLM",
       "severity": "high",
-      "pattern": null,
-      "keywords": [
-        "paywall",
-        "bypass",
-        "circumvent"
-      ],
       "llm_instruction": null,
       "clause_mapping": {
         "Computer Misuse": "18 U.S.C. \u00a7 1030"
       },
       "legal_reference": "https://www.law.cornell.edu/uscode/text/18/1030",
       "example_violation": "Using scripts to access premium articles without paying",
-      "index": 5,
       "category": "domain",
       "domain": "scraping",
       "action": "BLOCK",
-      "suggestion": "Review for compliance",
-      "source": "builtin"
+      "suggestion": "Access only content available without bypassing security or payment barriers."
     }
   ]
 }

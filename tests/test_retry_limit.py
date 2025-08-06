@@ -12,6 +12,9 @@ def test_run_pipeline_no_retry(monkeypatch):
         def aggregate(self, domains, user_rules):
             return [], "v1"
 
+        def load_prompt_rules(self, domain):
+            return []
+
     class FakePlan:
         action_plan = "plan"
 
@@ -19,7 +22,7 @@ def test_run_pipeline_no_retry(monkeypatch):
         calls["count"] += 1
         return FakePlan()
 
-    def fake_check_plan(plan, rules, rulebase_ver, llm=None):
+    def fake_check_plan(plan, rules, lookup, rulebase_ver, llm=None):
         entry = AuditLogEntry(
             rule_id="R",
             severity="low",
@@ -52,7 +55,10 @@ def test_run_pipeline_prompt_block(monkeypatch):
         def aggregate(self, domains, user_rules):
             return [], "v1"
 
-    def fake_check_prompt(prompt, rules, ver, llm=None):
+        def load_prompt_rules(self, domain):
+            return []
+
+    def fake_check_prompt(prompt, rules, lookup, ver, llm=None):
         entry = AuditLogEntry(
             rule_id="B", severity="high", action="BLOCK", input_text=prompt,
             justification="blocked", session_id="S", legal_reference="L1"
@@ -71,4 +77,4 @@ def test_run_pipeline_prompt_block(monkeypatch):
     msg, action, _ = main.run_pipeline("bad", "sess")
 
     assert action == "block"
-    assert "B" in msg and "blocked" in msg
+    assert "Request blocked" in msg
