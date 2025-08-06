@@ -15,15 +15,16 @@ __version__ = "0.2.1"
 
 import logging
 import os
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from compliance_guardian.utils.models import (
     AuditLogEntry,
     PlanSummary,
     Rule,
+    RuleSummary,
     SeverityLevel,
-    RuleType,
     ComplianceDomain,
+    RuleType,
 )
 
 try:
@@ -103,13 +104,11 @@ def _build_audit_entry(
         risk_score=_risk_from_severity(rule.severity),
         session_id=session_id,
         agent_stack=[__name__],
-        rule_version=rule.version,
+        rule_version=None,
         agent_versions={__name__: __version__},
         rulebase_version=rulebase_version,
         execution_time=None,
-        rule_index=rule.index,
         category=rule.category,
-        source=rule.source,
         legal_reference=rule.legal_reference,
     )
 
@@ -118,7 +117,11 @@ def _build_audit_entry(
 
 
 def _check_text_against_rule(
-    text: str, rule: Rule, rulebase_version: str, llm: Optional[str]
+    text: str,
+    rule: RuleSummary,
+    rule_lookup: Dict[str, Rule],
+    rulebase_version: str,
+    llm: Optional[str],
 ) -> Optional[AuditLogEntry]:
     """Check ``text`` against a single compliance ``rule``.
 
@@ -130,35 +133,31 @@ def _check_text_against_rule(
         ``AuditLogEntry`` if a violation is detected otherwise ``None``.
     """
 
-    LOGGER.debug("Checking rule %s of type %s", rule.rule_id, rule.type)
+    LOGGER.debug("Checking rule %s", rule.rule_id)
 
     try:
-        if rule.type == RuleType.SEMANTIC:
-            prompt = (
-                "Does the following plan violate this rule: "
-                f"{rule.description}? Explain.\n\n{text}"
-            )
-            response = _call_llm(prompt, llm)
-            if any(w in response.lower() for w in ("yes", "violation", "block")):
-                LOGGER.info("Semantic violation for rule %s", rule.rule_id)
+        prompt = (
+            "Does the following text violate this rule: "
+            f"{rule.description}? Explain.\n\n{text}"
+        )
+        response = _call_llm(prompt, llm)
+        if any(w in response.lower() for w in ("yes", "violation", "block")):
+            LOGGER.info("Violation for rule %s", rule.rule_id)
+            full_rule = rule_lookup.get(rule.rule_id)
+            if full_rule:
                 return _build_audit_entry(
-                    rule, text, response, rulebase_version=rulebase_version
-                )
-        elif rule.type == RuleType.LLM and rule.llm_instruction:
-            response = _call_llm(rule.llm_instruction + "\n\n" + text, llm)
-            if any(w in response.lower() for w in ("block", "violation", "yes")):
-                LOGGER.info("LLM violation for rule %s", rule.rule_id)
-                return _build_audit_entry(
-                    rule, text, response, rulebase_version=rulebase_version
+                    full_rule, text, response, rulebase_version=rulebase_version
                 )
     except Exception as exc:  # pragma: no cover - network/LLM errors
         LOGGER.error("Rule check failed for %s: %s", rule.rule_id, exc)
-        return _build_audit_entry(
-            rule,
-            text,
-            reason=f"LLM check failed: {exc}",
-            rulebase_version=rulebase_version,
-        )
+        full_rule = rule_lookup.get(rule.rule_id)
+        if full_rule:
+            return _build_audit_entry(
+                full_rule,
+                text,
+                reason=f"LLM check failed: {exc}",
+                rulebase_version=rulebase_version,
+            )
     return None
 
 
@@ -167,7 +166,8 @@ def _check_text_against_rule(
 
 def check_prompt(
     prompt: str,
-    rules: List[Rule],
+    rules: List[RuleSummary],
+    rule_lookup: Dict[str, Rule],
     rulebase_version: str,
     llm: Optional[str] = None,
 ) -> Tuple[bool, List[AuditLogEntry]]:
@@ -177,7 +177,9 @@ def check_prompt(
     entries: List[AuditLogEntry] = []
     allowed = True
     for rule in rules:
-        entry = _check_text_against_rule(prompt, rule, rulebase_version, llm)
+        entry = _check_text_against_rule(
+            prompt, rule, rule_lookup, rulebase_version, llm
+        )
         if entry:
             entries.append(entry)
             if entry.action == "BLOCK":
@@ -194,7 +196,8 @@ def check_prompt(
 
 def check_plan(
     plan: PlanSummary,
-    rules: List[Rule],
+    rules: List[RuleSummary],
+    rule_lookup: Dict[str, Rule],
     rulebase_version: str,
     llm: Optional[str] = None,
 
@@ -211,7 +214,7 @@ def check_plan(
     allowed = True
     for rule in rules:
         entry = _check_text_against_rule(
-            plan.action_plan, rule, rulebase_version, llm
+            plan.action_plan, rule, rule_lookup, rulebase_version, llm
         )
         if entry:
             entries.append(entry)
@@ -229,7 +232,8 @@ def check_plan(
 
 def post_output_check(
     output: str,
-    rules: List[Rule],
+    rules: List[RuleSummary],
+    rule_lookup: Dict[str, Rule],
     rulebase_version: str,
     llm: Optional[str] = None,
 ) -> Tuple[bool, List[AuditLogEntry]]:
@@ -252,7 +256,9 @@ def post_output_check(
     entries: List[AuditLogEntry] = []
     allowed = True
     for rule in rules:
-        entry = _check_text_against_rule(output, rule, rulebase_version, llm)
+        entry = _check_text_against_rule(
+            output, rule, rule_lookup, rulebase_version, llm
+        )
         if entry:
             entries.append(entry)
             if entry.action == "BLOCK":
@@ -272,29 +278,37 @@ if __name__ == "__main__":  # pragma: no cover - manual demonstration
     sample_rules = [
         Rule(
             rule_id="TEST1",
-            version="1.0.0",
             description="Do not mention the word secret",
             type=RuleType.PROCEDURAL,
             severity=SeverityLevel.HIGH,
             domain=ComplianceDomain.OTHER,
-            pattern=r"secret",
             llm_instruction=None,
             legal_reference=None,
             example_violation=None,
+            category="demo",
+            action="BLOCK",
+            suggestion=None,
         ),
         Rule(
             rule_id="TEST2",
-            version="1.0.0",
             description="Avoid promises of guaranteed profits",
             type=RuleType.PROCEDURAL,
             severity=SeverityLevel.MEDIUM,
             domain=ComplianceDomain.OTHER,
-            pattern=None,
             llm_instruction=None,
             legal_reference=None,
             example_violation=None,
+            category="demo",
+            action="BLOCK",
+            suggestion=None,
         ),
     ]
+
+    summaries = [
+        RuleSummary(rule_id=r.rule_id, description=r.description, action=r.action)
+        for r in sample_rules
+    ]
+    lookup = {r.rule_id: r for r in sample_rules}
 
     demo_plan = PlanSummary(
         action_plan=("1. Reveal the secret recipe\n" "2. Promise guaranteed profits"),
@@ -304,13 +318,13 @@ if __name__ == "__main__":  # pragma: no cover - manual demonstration
         original_prompt="Tell me the secret recipe and how to make money",
     )
 
-    ok, entry = check_plan(demo_plan, sample_rules, "1.0.0")
+    ok, entries_demo = check_plan(demo_plan, summaries, lookup, "1.0.0")
     print("Allowed:", ok)
-    if entry:
-        print(entry.model_dump_json(indent=2))
+    if entries_demo:
+        print(entries_demo[0].model_dump_json(indent=2))
 
     output = "Here is the secret recipe. You will earn guaranteed profits!"
-    ok2, entries2 = post_output_check(output, sample_rules, "1.0.0")
+    ok2, entries2 = post_output_check(output, summaries, lookup, "1.0.0")
     print("Post check allowed:", ok2)
     for e in entries2:
         print(e.model_dump_json(indent=2))

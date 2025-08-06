@@ -3,23 +3,14 @@
 from unittest.mock import patch
 
 from compliance_guardian.agents import primary_agent
-from compliance_guardian.utils.models import PlanSummary
-from compliance_guardian.utils import models
+from compliance_guardian.utils.models import PlanSummary, RuleSummary
 
 
 class TestPrimaryAgent:
     """Plan generation and execution with mocked LLM."""
 
     def dummy_rule(self):
-        return models.Rule.model_construct(
-            rule_id="R1",
-            description="desc",
-            type=models.RuleType.REGEX,
-            severity="low",
-            domain="other",
-            pattern="foo",
-            action="LOG",
-        )
+        return RuleSummary(rule_id="R1", description="desc", action="LOG")
 
     def test_generate_plan_success(self):
         with patch.object(

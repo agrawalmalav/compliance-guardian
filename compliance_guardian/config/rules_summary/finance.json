@@ -1,30 +1,27 @@
-{
-  "version": "1.0.0",
-  "rules": [
-    {
-      "rule_id": "FIN001",
-      "description": "Do not expose full account or credit card numbers.",
-      "pattern": "\\b\\d{4}[- ]?\\d{4}[- ]?\\d{4}[- ]?\\d{4}\\b"
-    },
-    {
-      "rule_id": "FIN002",
-      "description": "Avoid misleading guarantees of investment returns.",
-      "pattern": null
-    },
-    {
-      "rule_id": "FIN003",
-      "description": "Require customer consent before sharing financial data with third parties.",
-      "pattern": null
-    },
-    {
-      "rule_id": "FIN004",
-      "description": "Detect text suggesting discriminatory lending or denial based on protected attributes.",
-      "pattern": null
-    },
-    {
-      "rule_id": "FIN005",
-      "description": "Prevent insider trading tips or non-public information disclosures.",
-      "pattern": null
-    }
-  ]
-}
+[
+  {
+    "rule_id": "FIN001",
+    "description": "Never expose full account or credit card numbers.",
+    "action": "BLOCK"
+  },
+  {
+    "rule_id": "FIN002",
+    "description": "Never promise guaranteed investment returns.",
+    "action": "WARN"
+  },
+  {
+    "rule_id": "FIN003",
+    "description": "Always obtain explicit customer consent before sharing financial data with third parties.",
+    "action": "BLOCK"
+  },
+  {
+    "rule_id": "FIN004",
+    "description": "Never make lending decisions based on protected attributes.",
+    "action": "BLOCK"
+  },
+  {
+    "rule_id": "FIN005",
+    "description": "Do not share insider tips or non-public financial information.",
+    "action": "BLOCK"
+  }
+]

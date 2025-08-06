@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock
-
 import main
 from compliance_guardian.utils import models
 
@@ -21,7 +19,7 @@ def test_run_pipeline_llm_selection(monkeypatch):
             original_prompt=prompt,
         )
 
-    def fake_check_plan(plan, rules, ver, llm=None):
+    def fake_check_plan(plan, rules, lookup, ver, llm=None):
         assert llm == "openai"
         return True, []
 
@@ -29,13 +27,16 @@ def test_run_pipeline_llm_selection(monkeypatch):
         assert llm == "openai"
         return "done"
 
-    def fake_post(output, rules, ver, llm=None):
+    def fake_post(output, rules, lookup, ver, llm=None):
         assert llm == "openai"
         return True, []
 
     class DummySelector:
         def aggregate(self, domains, user_rules):
             return [], "v1"
+
+        def load_prompt_rules(self, domain):
+            return []
 
     monkeypatch.setattr(main.joint_extractor, "extract", fake_extract)
     monkeypatch.setattr(main.primary_agent, "generate_plan", fake_generate_plan)
