@@ -140,6 +140,7 @@ def run_pipeline(
         for r in user_rules
     )
 
+
     warn_rules = [s for s in summaries if s.action == "WARN"]
 
     if warn_rules:
@@ -152,6 +153,7 @@ def run_pipeline(
     # --- Prompt pre-check ---
     allowed_prompt, prompt_entries = compliance_agent.check_prompt(
         prompt, summaries, rule_lookup, rulebase_ver, llm=llm
+
     )
     for entry in prompt_entries:
         log_decision(entry)
@@ -197,6 +199,7 @@ def run_pipeline(
     # --- Pre-execution compliance check ---
     allowed, plan_entries = compliance_agent.check_plan(
         plan, summaries, rule_lookup, rulebase_ver, llm=llm
+
     )
     for entry in plan_entries:
         log_decision(entry)
