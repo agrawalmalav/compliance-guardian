@@ -53,7 +53,9 @@ class TestComplianceAgent:
             original_prompt="p",
         )
         with patch.object(
-            compliance_agent, "_call_llm", return_value="all good"
+            compliance_agent,
+            "_call_llm",
+            return_value='{"violation": false, "confidence": 0.1, "evidence": "none"}',
         ):
             allowed, entries = compliance_agent.check_plan(
                 plan, [summary], lookup, "v1"
@@ -71,7 +73,9 @@ class TestComplianceAgent:
             original_prompt="p",
         )
         with patch.object(
-            compliance_agent, "_call_llm", return_value="block"
+            compliance_agent,
+            "_call_llm",
+            return_value='{"violation": true, "confidence": 0.9, "evidence": "bad"}',
         ):
             allowed, entries = compliance_agent.check_plan(
                 plan, [summary], lookup, "v1"
@@ -90,7 +94,9 @@ class TestComplianceAgent:
             original_prompt="p",
         )
         with patch.object(
-            compliance_agent, "_call_llm", return_value="Yes violation"
+            compliance_agent,
+            "_call_llm",
+            return_value='{"violation": true, "confidence": 0.8, "evidence": "mean"}',
         ):
             allowed, entries = compliance_agent.check_plan(
                 plan, [summary], lookup, "v1"
@@ -110,7 +116,9 @@ class TestComplianceAgent:
         summary = models.RuleSummary(rule_id="W", description="no foo", action="WARN")
         lookup = {rule.rule_id: rule}
         with patch.object(
-            compliance_agent, "_call_llm", return_value="violation found"
+            compliance_agent,
+            "_call_llm",
+            return_value='{"violation": true, "confidence": 0.7, "evidence": "foo"}',
         ):
             allowed, entries = compliance_agent.check_prompt(
                 "foo", [summary], lookup, "v1"
@@ -143,7 +151,9 @@ class TestComplianceAgent:
         rule, summary = llm_rule
         lookup = {rule.rule_id: rule}
         with patch.object(
-            compliance_agent, "_call_llm", return_value="block"
+            compliance_agent,
+            "_call_llm",
+            return_value='{"violation": true, "confidence": 0.9, "evidence": "bad"}',
         ):
             allowed, entries = compliance_agent.post_output_check(
                 "foo bar", [summary], lookup, "v1"

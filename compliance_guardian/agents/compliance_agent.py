@@ -15,7 +15,8 @@ __version__ = "0.2.1"
 
 import logging
 import os
-from typing import Dict, List, Optional, Tuple
+import json
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from compliance_guardian.utils.models import (
     AuditLogEntry,
@@ -44,23 +45,47 @@ logging.basicConfig(level=logging.INFO)
 # ---------------------------------------------------------------------------
 
 
-def _call_llm(prompt: str, llm: Optional[str]) -> str:
-    """Invoke the configured LLM with ``prompt`` and return the response."""
+ADJUDICATE_SYSTEM = (
+    "You are a compliance adjudicator. Be conservative and factual. "
+    "Only use evidence present in the TEXT. Do not infer motives or intent beyond the text."
+)
 
-    LOGGER.debug("LLM prompt: %s", prompt)
+ADJUDICATE_USER_TEMPLATE = """RULE (id={rule_id}, action={action}):
+{rule_desc}
+
+TEXT:
+{text}
+
+Decide strictly on the evidence in TEXT.
+Return JSON only (one line):
+{{"violation": true|false, "confidence": 0.0-1.0, "evidence": "<short quote from TEXT or 'none'>"}}
+"""
+
+
+# ---------------------------------------------------------------------------
+
+def _call_llm(messages: Sequence[Dict[str, str]], llm: Optional[str]) -> str:
+    """Invoke the configured LLM with ``messages`` and return the response."""
+
+    LOGGER.debug("LLM messages: %s", messages)
     if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
         client = openai.OpenAI()
         resp = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "system", "content": prompt}],
-            temperature=0,
+            messages=messages,  # type: ignore[arg-type]
+            temperature=0.1,
+            top_p=0.9,
+            max_tokens=300,
         )
         content = resp.choices[0].message.content or ""
         return content.strip()
     if (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         model = genai.GenerativeModel("gemini-2.5-flash")
-        res = model.generate_content(prompt)
+        res = model.generate_content(
+            "\n".join(m["content"] for m in messages),
+            generation_config={"temperature": 0.1, "top_p": 0.9},
+        )
         return res.text.strip()
     LOGGER.warning("No LLM credentials configured; LLM checks will fail")
     raise RuntimeError("No LLM credentials configured")
@@ -136,17 +161,29 @@ def _check_text_against_rule(
     LOGGER.debug("Checking rule %s", rule.rule_id)
 
     try:
-        prompt = (
-            "Does the following text violate this rule: "
-            f"{rule.description}? Explain.\n\n{text}"
+        system = ADJUDICATE_SYSTEM
+        user = ADJUDICATE_USER_TEMPLATE.format(
+            rule_id=rule.rule_id,
+            action=rule.action,
+            rule_desc=rule.description or "",
+            text=text,
         )
-        response = _call_llm(prompt, llm)
-        if any(w in response.lower() for w in ("yes", "violation", "block")):
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
+        response = _call_llm(messages, llm)
+        try:
+            data = json.loads(response)
+        except json.JSONDecodeError:
+            data = {}
+        if data.get("violation"):
             LOGGER.info("Violation for rule %s", rule.rule_id)
             full_rule = rule_lookup.get(rule.rule_id)
             if full_rule:
+                reason = json.dumps(data)
                 return _build_audit_entry(
-                    full_rule, text, response, rulebase_version=rulebase_version
+                    full_rule, text, reason, rulebase_version=rulebase_version
                 )
     except Exception as exc:  # pragma: no cover - network/LLM errors
         LOGGER.error("Rule check failed for %s: %s", rule.rule_id, exc)

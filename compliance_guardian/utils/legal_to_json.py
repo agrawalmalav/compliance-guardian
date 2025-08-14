@@ -34,14 +34,19 @@ def _call_llm(prompt: str) -> str:
         resp = client.chat.completions.create(
             model=model,
             messages=[{"role": "system", "content": prompt}],
-            temperature=0,
+            temperature=0.1,
+            top_p=0.9,
+            max_tokens=400,
         )
         content = resp.choices[0].message.content or ""
         return content.strip()
     if genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         model = genai.GenerativeModel("gemini-2.5-flash")
-        res = model.generate_content(prompt)
+        res = model.generate_content(
+            prompt,
+            generation_config={"temperature": 0.1, "top_p": 0.9},
+        )
         return res.text.strip()
     raise RuntimeError("No LLM credentials configured")
 

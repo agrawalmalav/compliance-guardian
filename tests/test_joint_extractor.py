@@ -31,7 +31,10 @@ def test_joint_extractor_rules():
 
 
 def test_llm_extract_plain_json():
-    output = '{"domains": ["scraping"], "instructions": ["never store emails"]}'
+    output = (
+        '{"domains": ["scraping"], "user_rules": '
+        '[{"description_actionable": "never store emails"}]}'
+    )
     dummy = _dummy_openai(output)
     with patch.dict(os.environ, {"OPENAI_API_KEY": "x"}), patch.object(
         joint_extractor, "openai", dummy
@@ -42,7 +45,11 @@ def test_llm_extract_plain_json():
 
 
 def test_llm_extract_code_fence():
-    fenced = "```json\n{\"domains\": [\"scraping\"], \"instructions\": [\"never store emails\"]}\n```"
+    fenced = (
+        """```json
+{"domains": ["scraping"], "user_rules": [{"description_actionable": "never store emails"}]}
+```"""
+    )
     dummy = _dummy_openai(fenced)
     with patch.dict(os.environ, {"OPENAI_API_KEY": "x"}), patch.object(
         joint_extractor, "openai", dummy

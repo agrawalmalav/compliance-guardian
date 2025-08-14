@@ -122,7 +122,9 @@ def translate_explanation(text: str, target_lang: str = "fr") -> str:
                 resp = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[{"role": "user", "content": prompt}],
-                    temperature=0,
+                    temperature=0.1,
+                    top_p=0.9,
+                    max_tokens=200,
                 )
                 translated = (
                     resp.choices[0].message.content or ""

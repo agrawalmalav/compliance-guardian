@@ -50,6 +50,41 @@ logging.basicConfig(level=logging.INFO)
 
 # ---------------------------------------------------------------------------
 
+PLAN_SYSTEM = (
+    "You are a planning assistant. Plan steps that ACHIEVE THE GOAL while obeying all constraints.\n"
+    "If a step would violate constraints, REPLACE it with a compliant alternative. Do NOT refuse; re-plan safely.\n"
+    'Return JSON only: {"goal": "...", "steps": ["...", "..."]}'
+)
+
+
+def _constraints_block(lines: List[str]) -> str:
+    lines = [l for l in lines if l]
+    return "- " + "\n- ".join(lines) if lines else "(none)"
+
+
+PLAN_USER_TEMPLATE = """GOAL:
+{prompt}
+
+Constraints:
+{constraints_lines}
+"""
+
+
+EXEC_SYSTEM = (
+    "You will execute the plan while obeying the constraints. "
+    "If a step would violate the constraints, adapt it to a compliant alternative without refusing."
+)
+
+EXEC_USER_TEMPLATE = """Goal:
+{goal}
+
+Steps:
+{steps}
+
+Constraints:
+{constraints_lines}
+"""
+
 
 def _coerce_domain(domain: str) -> ComplianceDomain:
     """Convert ``domain`` string to :class:`ComplianceDomain` if possible."""
@@ -69,13 +104,19 @@ def _call_llm(messages: Sequence[Dict[str, str]], llm: Optional[str]) -> str:
         resp = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages,  # type: ignore[arg-type]
+            temperature=0.1,
+            top_p=0.9,
+            max_tokens=400,
         )
         content = resp.choices[0].message.content or ""
         return content.strip()
     if (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         model = genai.GenerativeModel("gemini-2.5-flash")
-        res = model.generate_content("\n".join(m["content"] for m in messages))
+        res = model.generate_content(
+            "\n".join(m["content"] for m in messages),
+            generation_config={"temperature": 0.1, "top_p": 0.9},
+        )
         return res.text.strip()
     LOGGER.warning("No LLM credentials configured; falling back to demo plan")
     raise RuntimeError("No LLM credentials configured")
@@ -105,14 +146,16 @@ def generate_plan(
 
     domain = domains[0] if domains else "other"
     LOGGER.info("Generating plan for domains %s with prompt: %s", domains, prompt)
-    constraint_text = "\n".join(constraints)
-    plan_system = (
-        "You are a task planner for an AI assistant. Given the prompt: {prompt}, "
-        "decompose into step-by-step actions and the main goal. Respond in JSON "
-        "with keys 'goal' and 'steps'.\nCompliance constraints:\n{constraints}"
-    ).format(prompt=prompt, constraints=constraint_text)
-
-    messages = [{"role": "system", "content": plan_system}]
+    constraints_lines = _constraints_block(constraints)
+    messages = [
+        {"role": "system", "content": PLAN_SYSTEM},
+        {
+            "role": "user",
+            "content": PLAN_USER_TEMPLATE.format(
+                prompt=prompt, constraints_lines=constraints_lines
+            ),
+        },
+    ]
     try:
         reply = _call_llm(messages, llm)
         reply = _strip_code_fence(reply)
@@ -184,22 +227,20 @@ def execute_task(
     if not approved:
         LOGGER.warning("Execution aborted: plan not approved")
         return "Execution aborted: plan not approved"
-
-    rule_lines = [f"({r.rule_id}) {r.description}" for r in rules]
-    system_rules = "You must comply with the following rules:\n" + "\n".join(rule_lines)
-
-    user_steps = (
-        "Goal: "
-        + plan.goal
-        + "\n"
-        + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(plan.sub_actions))
-    )
+    warn_lines = [r.description for r in rules if r.action == "WARN" and r.description]
+    constraints_lines = _constraints_block(warn_lines)
+    steps = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(plan.sub_actions))
     messages = [
-        {"role": "system", "content": system_rules},
-        {"role": "user", "content": user_steps},
+        {"role": "system", "content": EXEC_SYSTEM},
+        {
+            "role": "user",
+            "content": EXEC_USER_TEMPLATE.format(
+                goal=plan.goal, steps=steps, constraints_lines=constraints_lines
+            ),
+        },
     ]
 
-    LOGGER.info("Executing plan with %d rule constraints", len(rules))
+    LOGGER.info("Executing plan with %d rule constraints", len(warn_lines))
     try:
         output = _call_llm(messages, llm)
     except Exception as exc:  # pragma: no cover - network errors

@@ -45,39 +45,55 @@ _KEYWORDS = {
 }
 
 
+EXTRACT_SYSTEM = "You extract compliance domains and explicit user rules."
+
+EXTRACT_USER_TEMPLATE = """PROMPT:
+{prompt}
+
+Return JSON exactly (one line):
+{{
+  "domains": ["scraping"|"finance"|"medical"|"other", ... up to 2],
+  "user_rules": [
+    {{
+      "rule_id": "USR001",
+      "action": "BLOCK"|"WARN",
+      "description_actionable": "<imperative and affirmative, one sentence>",
+      "activation": {{"keywords_any": ["..."]}},
+      "applicable_contexts": ["pre-prompt","plan","output"]
+    }}
+  ]
+}}
+
+If none, return {{"domains":["other"],"user_rules":[]}}.
+"""
+
+
 def _llm_extract(prompt: str, llm: Optional[str]) -> Tuple[List[str], List[Rule]]:
-    """Use an LLM to obtain domains and instructions.
+    """Use an LLM to obtain domains and instructions."""
 
-    Parameters
-    ----------
-    prompt:
-        User provided text to analyse.
-    llm:
-        Preferred LLM provider (``"openai"`` or ``"gemini"``). ``None`` uses the
-        first available provider.
-    """
-
-    system = (
-        "Classify the prompt into domains (scraping, finance, medical, other) "
-        "and extract explicit user instructions starting with phrases like "
-        "'do not', 'never', or 'avoid'. Respond in JSON with keys 'domains' "
-        "(list) and 'instructions' (list of strings). Prompt: {prompt}"
-    ).format(prompt=prompt)
+    messages = [
+        {"role": "system", "content": EXTRACT_SYSTEM},
+        {"role": "user", "content": EXTRACT_USER_TEMPLATE.format(prompt=prompt)},
+    ]
     try:
         if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
-
             client = openai.OpenAI()
             resp = client.chat.completions.create(
                 model="gpt-3.5-turbo",
-                messages=[{"role": "system", "content": system}],
-                temperature=0,
+                messages=messages,  # type: ignore[arg-type]
+                temperature=0.1,
+                top_p=0.9,
+                max_tokens=400,
             )
             raw = resp.choices[0].message.content or "{}"
             raw = _strip_code_fence(raw)
         elif (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
             genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
             model = genai.GenerativeModel("gemini-2.5-flash")
-            res = model.generate_content(system)
+            res = model.generate_content(
+                "\n".join(m["content"] for m in messages),
+                generation_config={"temperature": 0.1, "top_p": 0.9},
+            )
             raw = res.text or "{}"
             raw = _strip_code_fence(raw)
         else:
@@ -88,11 +104,16 @@ def _llm_extract(prompt: str, llm: Optional[str]) -> Tuple[List[str], List[Rule]
             LOGGER.warning("LLM joint extraction failed: %s; output=%r", exc, raw)
             data = {}
         domains = data.get("domains") or []
-        instructions = data.get("instructions") or []
+        user_rules = data.get("user_rules") or []
+        instructions = [
+            r.get("description_actionable", "")
+            for r in user_rules
+            if isinstance(r, dict)
+        ]
     except Exception as exc:  # pragma: no cover - network/LLM errors
         LOGGER.warning("LLM joint extraction failed: %s", exc)
         domains, instructions = [], []
-    rules = [_build_user_rule(i + 1, inst) for i, inst in enumerate(instructions)]
+    rules = [_build_user_rule(i + 1, inst) for i, inst in enumerate(instructions) if inst]
     return domains, rules
 
 
