@@ -30,7 +30,9 @@ class TestOutputValidator:
         rule, summary = llm_rule
         lookup = {rule.rule_id: rule}
         with patch.object(
-            output_validator, "_call_llm", return_value="Yes violation"
+            output_validator,
+            "_call_llm",
+            return_value='{"violation": true, "confidence": 0.9, "evidence": "bad"}',
         ):
             ok, entries = output_validator.validate_output(
                 "text", [summary], lookup, "v1"
@@ -50,7 +52,9 @@ class TestOutputValidator:
         rule, summary = llm_rule
         lookup = {rule.rule_id: rule}
         with patch.object(
-            output_validator, "_call_llm", return_value="all good"
+            output_validator,
+            "_call_llm",
+            return_value='{"violation": false, "confidence": 0.1, "evidence": "none"}',
         ):
             ok, entries = output_validator.validate_output(
                 "clean", [summary], lookup, "v1"

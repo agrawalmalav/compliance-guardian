@@ -17,6 +17,7 @@ __version__ = "0.2.1"
 import logging
 import os
 from typing import Dict, Iterable
+import json
 
 try:
     import openai  # type: ignore
@@ -43,41 +44,56 @@ _KEYWORDS: Dict[str, Iterable[str]] = {
 # ---------------------------------------------------------------------------
 
 
+CLASSIFY_SYSTEM = "You assign compliance domains from {'scraping','finance','medical','other'}."
+
+CLASSIFY_USER_TEMPLATE = """TEXT:
+{prompt}
+
+Return JSON only (one line):
+{{"primary":"scraping|finance|medical|other","secondary":"scraping|finance|medical|other|null","confidence":0.0-1.0}}
+
+If confidence < 0.6, set primary="other" and secondary=null.
+"""
+
+
 def _llm_classify(prompt: str) -> str:
     """Classify ``prompt`` with an LLM as a last resort."""
-    system = (
-        "Classify this user prompt as one of: 'scraping', 'finance', "
-        "'medical', or 'other': {prompt}"
-    ).format(prompt=prompt)
 
     LOGGER.info("Invoking LLM for domain classification")
+    messages = [
+        {"role": "system", "content": CLASSIFY_SYSTEM},
+        {"role": "user", "content": CLASSIFY_USER_TEMPLATE.format(prompt=prompt)},
+    ]
     try:
         if openai and os.getenv("OPENAI_API_KEY"):
             client = openai.OpenAI()
             resp = client.chat.completions.create(
                 model="gpt-3.5-turbo",
-                messages=[{"role": "system", "content": system}],
-                temperature=0,
+                messages=messages,  # type: ignore[arg-type]
+                temperature=0.1,
+                top_p=0.9,
+                max_tokens=200,
             )
-            raw = resp.choices[0].message.content or ""
-            text = raw.strip().lower()
+            raw = resp.choices[0].message.content or "{}"
         elif genai and os.getenv("GEMINI_API_KEY"):
             genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
             model = genai.GenerativeModel("gemini-2.5-flash")
-            res = model.generate_content(system)
-            text = res.text.strip().lower()
+            res = model.generate_content(
+                "\n".join(m["content"] for m in messages),
+                generation_config={"temperature": 0.1, "top_p": 0.9},
+            )
+            raw = res.text or "{}"
         else:  # pragma: no cover - only hits when no API keys configured
-            LOGGER.warning(
-                "No LLM credentials available; defaulting to 'other'")
+            LOGGER.warning("No LLM credentials available; defaulting to 'other'")
             return "other"
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return "other"
+        return data.get("primary", "other") or "other"
     except Exception as exc:  # pragma: no cover - LLM failure
         LOGGER.error("LLM classification failed: %s", exc)
         return "other"
-
-    for dom in ("scraping", "finance", "medical"):
-        if dom in text:
-            return dom
-    return "other"
 
 
 # ---------------------------------------------------------------------------
