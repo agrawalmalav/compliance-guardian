@@ -4,6 +4,7 @@ The previous FastAPI demo has been removed in favour of the Streamlit UI.
 Run ``streamlit run ui/streamlit_app.py`` to launch the demo application.
 """
 
+
 from __future__ import annotations
 
 import logging
@@ -433,5 +434,6 @@ async def list_rules_page() -> str:
 
 
 # ---------------------------------------------------------------------------
+
 if __name__ == "__main__":  # pragma: no cover - manual launch
     print("Use 'streamlit run ui/streamlit_app.py' to start the UI")
