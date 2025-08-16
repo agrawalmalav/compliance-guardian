@@ -129,3 +129,22 @@ The rule files include citations to GDPR, HIPAA, PCI DSS and other regulations
 within the `legal_reference` field for traceability.
 
 Full API documentation is available in the [docs](docs/index.rst) directory.
+
+## Streamlit Demo UI
+
+Install optional dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Launch the local interface:
+
+```bash
+streamlit run ui/streamlit_app.py
+```
+
+Audit logs and governance reports are written under `compliance_guardian/logs`
+and `compliance_guardian/reports` respectively. Processing occurs locally –
+only API calls to the selected LLM provider leave your machine. The interface
+surfaced rule hits, legal references and suggestions for full transparency.
