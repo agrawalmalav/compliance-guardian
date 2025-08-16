@@ -16,3 +16,6 @@ typer
 python-dotenv
 
 pypandoc
+
+streamlit>=1.36
+pandas>=2.2

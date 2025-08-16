@@ -1,9 +1,7 @@
-"""FastAPI web interface for the Compliance Guardian agents.
+"""Deprecated web interface.
 
-This minimal application exposes a simple HTML form that feeds prompts
-through the full compliance pipeline. All intermediate results are
-rendered so users can inspect the classification, plan, rule checks and
-final decision. Audit logs and governance reports can also be downloaded.
+The previous FastAPI demo has been removed in favour of the Streamlit UI.
+Run ``streamlit run ui/streamlit_app.py`` to launch the demo application.
 """
 
 from __future__ import annotations
@@ -435,8 +433,5 @@ async def list_rules_page() -> str:
 
 
 # ---------------------------------------------------------------------------
-
 if __name__ == "__main__":  # pragma: no cover - manual launch
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print("Use 'streamlit run ui/streamlit_app.py' to start the UI")
