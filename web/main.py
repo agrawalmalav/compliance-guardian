@@ -13,8 +13,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
+import json
+
 from fastapi import FastAPI, Form, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -25,7 +27,12 @@ from compliance_guardian.agents import (
     rule_selector,
 )
 from compliance_guardian.utils import log_writer, user_study
-from compliance_guardian.utils.models import AuditLogEntry, PlanSummary
+from compliance_guardian.utils.models import (
+    AuditLogEntry,
+    PlanSummary,
+    Rule,
+    RuleSummary,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -49,11 +56,20 @@ app.mount(
     name="reports-static",
 )
 
+# Expose rule directory for users to inspect rule files.
+app.mount(
+    "/static/rules",
+    StaticFiles(directory=str(_SELECTOR.rules_dir)),
+    name="rules-static",
+)
+
 
 class PromptRequest(BaseModel):
     """Request model containing a user prompt."""
 
     prompt: str
+    llm: Optional[str] = None
+    instructions: str = ""
 
 
 class PipelineResult(BaseModel):
@@ -75,34 +91,60 @@ class PipelineResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _run_pipeline(prompt: str) -> PipelineResult:
-    """Run the compliance workflow for ``prompt`` and return details."""
+def _pipeline_steps(
+    prompt: str,
+    llm: Optional[str],
+    instructions: str,
+):
+    """Generator yielding status updates and final :class:`PipelineResult`."""
 
+    def _emit(msg: str):
+        yield json.dumps({"type": "status", "message": msg}) + "\n"
+
+    yield from _emit("Classifying domain")
     try:
         domain = domain_classifier.classify_domain(prompt)
     except Exception as exc:  # pragma: no cover - unexpected failure
         LOGGER.exception("Domain classification failed: %s", exc)
-        raise HTTPException(
-            status_code=500, detail="Domain classification failed")
+        raise HTTPException(status_code=500, detail="Domain classification failed")
+    yield from _emit(f"Domain: {domain}")
 
+    yield from _emit("Loading rules")
     try:
-        rules = _SELECTOR.load(domain)
+        full_rules: List[Rule] = _SELECTOR.load(domain)
         rulebase_ver = _SELECTOR.get_version(domain)
     except Exception as exc:
         LOGGER.exception("Rule loading failed: %s", exc)
-        raise HTTPException(
-            status_code=500, detail="Could not load compliance rules")
+        raise HTTPException(status_code=500, detail="Could not load compliance rules")
+    summaries = [
+        RuleSummary(rule_id=r.rule_id, description=r.description, action=r.action)
+        for r in full_rules
+    ]
+    rule_lookup = {r.rule_id: r for r in full_rules}
 
-    plan = primary_agent.generate_plan(prompt, domain)
+    user_constraints = [s.strip() for s in instructions.splitlines() if s.strip()]
 
-    plan_allowed, plan_entry = compliance_agent.check_plan(
-        plan, rules, rulebase_ver)
+    yield from _emit("Generating plan")
+    plan = primary_agent.generate_plan(prompt, [domain], user_constraints, llm=llm)
 
-    if plan_allowed:
+    yield from _emit("Checking plan for compliance")
+    allowed, plan_entries = compliance_agent.check_plan(
+        plan, summaries, rule_lookup, rulebase_ver, llm=llm
+    )
+    plan_entry = plan_entries[0] if plan_entries else None
+
+    if allowed:
+        yield from _emit("Executing plan")
+        exec_rules = summaries + [
+            RuleSummary(rule_id=f"USER{i+1}", description=text, action="WARN")
+            for i, text in enumerate(user_constraints)
+        ]
         execution_output = primary_agent.execute_task(
-            plan, rules, approved=True)
+            plan, exec_rules, approved=True, llm=llm
+        )
+        yield from _emit("Checking output for compliance")
         output_allowed, output_entries = compliance_agent.post_output_check(
-            execution_output, rules, rulebase_ver
+            execution_output, summaries, rule_lookup, rulebase_ver, llm=llm
         )
     else:
         execution_output = "Execution blocked: plan violates compliance rules"
@@ -110,10 +152,11 @@ def _run_pipeline(prompt: str) -> PipelineResult:
         output_entries = []
 
     final_action = "allow"
-    if not output_allowed or not plan_allowed:
+    if not output_allowed or not allowed:
         final_action = "block"
     elif any(e.action == "WARN" for e in output_entries):
         final_action = "warn"
+    yield from _emit(f"Final action: {final_action}")
 
     all_entries: List[AuditLogEntry] = []
     if plan_entry:
@@ -128,12 +171,12 @@ def _run_pipeline(prompt: str) -> PipelineResult:
         report_name = f"report_{timestamp}.md"
         log_writer.log_session_report(all_entries, report_name)
 
-    return PipelineResult(
+    result = PipelineResult(
         prompt=prompt,
         domain=domain,
-        rules=[r.rule_id for r in rules],
+        rules=[r.rule_id for r in summaries],
         plan=plan,
-        plan_allowed=plan_allowed,
+        plan_allowed=allowed,
         plan_violation=plan_entry,
         execution_output=execution_output,
         output_allowed=output_allowed,
@@ -141,6 +184,19 @@ def _run_pipeline(prompt: str) -> PipelineResult:
         report_file=report_name,
         final_action=final_action,
     )
+    yield json.dumps({"type": "result", "payload": result.model_dump()}) + "\n"
+
+
+def _run_pipeline(prompt: str, llm: Optional[str] = None, instructions: str = "") -> PipelineResult:
+    """Helper to run pipeline and capture final result."""
+
+    result: Optional[PipelineResult] = None
+    for line in _pipeline_steps(prompt, llm, instructions):
+        data = json.loads(line)
+        if data.get("type") == "result":
+            result = PipelineResult.model_validate(data["payload"])
+    assert result is not None
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -218,27 +274,89 @@ def _render_result_html(result: PipelineResult) -> str:
 
 @app.get("/", response_class=HTMLResponse)
 async def form() -> str:
-    """Return a simple HTML form for entering a prompt."""
+    """Return a simple interactive page for entering a prompt."""
 
     return """
     <html>
       <head><title>Compliance Guardian</title></head>
       <body>
         <h1>Compliance Guardian Demo</h1>
-        <form action='/submit' method='post'>
+        <p><a href='/rules'>Rule Directory</a></p>
+        <form id='prompt-form'>
           <textarea name='prompt' rows='4' cols='60'></textarea><br>
+          <label>LLM:
+            <select name='llm'>
+              <option value='openai'>ChatGPT</option>
+              <option value='gemini'>Gemini</option>
+            </select>
+          </label><br>
+          <label>Custom Instructions:</label><br>
+          <textarea name='instructions' rows='3' cols='60'></textarea><br>
           <input type='submit' value='Run Pipeline'>
         </form>
+        <h2>Status</h2>
+        <div id='status'></div>
+        <h2>Result</h2>
+        <pre id='result'></pre>
+        <script>
+        const form = document.getElementById('prompt-form');
+        form.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            document.getElementById('status').innerHTML = '';
+            document.getElementById('result').textContent = '';
+            const resp = await fetch('/stream', {method: 'POST', body: new FormData(form)});
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+            while (true) {
+                const {value, done} = await reader.read();
+                if (done) break;
+                buf += decoder.decode(value, {stream: true});
+                const lines = buf.split('\n');
+                buf = lines.pop();
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    const msg = JSON.parse(line);
+                    if (msg.type === 'status') {
+                        const div = document.createElement('div');
+                        div.textContent = msg.message;
+                        document.getElementById('status').appendChild(div);
+                    } else if (msg.type === 'result') {
+                        document.getElementById('result').textContent = JSON.stringify(msg.payload, null, 2);
+                    }
+                }
+            }
+        });
+        </script>
       </body>
     </html>
     """
 
 
+@app.post("/stream")
+async def stream(
+    prompt: str = Form(...),
+    llm: Optional[str] = Form(None),
+    instructions: str = Form(""),
+):
+    """Stream live status updates for a given ``prompt``."""
+
+    def _byte_stream():
+        for chunk in _pipeline_steps(prompt, llm, instructions):
+            yield chunk.encode("utf-8")
+
+    return StreamingResponse(_byte_stream(), media_type="text/plain")
+
+
 @app.post("/submit", response_class=HTMLResponse)
-async def submit(prompt: str = Form(...)) -> HTMLResponse:
+async def submit(
+    prompt: str = Form(...),
+    llm: Optional[str] = Form(None),
+    instructions: str = Form(""),
+) -> HTMLResponse:
     """Run the pipeline for ``prompt`` and show a detailed result page."""
 
-    result = _run_pipeline(prompt)
+    result = _run_pipeline(prompt, llm, instructions)
     html = _render_result_html(result)
     return HTMLResponse(content=html)
 
@@ -247,7 +365,7 @@ async def submit(prompt: str = Form(...)) -> HTMLResponse:
 async def api_submit(req: PromptRequest) -> PipelineResult:
     """JSON API endpoint mirroring :func:`submit`."""
 
-    return _run_pipeline(req.prompt)
+    return _run_pipeline(req.prompt, req.llm, req.instructions)
 
 
 @app.post("/feedback", response_class=HTMLResponse)
@@ -303,6 +421,17 @@ async def list_reports() -> str:
         for name in files
     ) or "<li>No reports available</li>"
     return f"<html><body><h1>Reports</h1><ul>{links}</ul></body></html>"
+
+
+@app.get("/rules", response_class=HTMLResponse)
+async def list_rules_page() -> str:
+    """List available rule files for inspection."""
+
+    files = sorted(p.name for p in _SELECTOR.rules_dir.glob("*.json"))
+    links = "".join(
+        f"<li><a href='/static/rules/{name}'>{name}</a></li>" for name in files
+    ) or "<li>No rules available</li>"
+    return f"<html><body><h1>Rule Directory</h1><ul>{links}</ul><p><a href='/'>Back</a></p></body></html>"
 
 
 # ---------------------------------------------------------------------------
