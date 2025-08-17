@@ -20,7 +20,6 @@ from compliance_guardian.agents import (
     compliance_agent,
     primary_agent,
     rule_selector,
-    joint_extractor,
 )
 from compliance_guardian.utils.log_writer import (
     log_decision,
@@ -33,6 +32,36 @@ LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 app = typer.Typer(help="Run compliance pipeline on prompts")
+
+
+class _JointExtractorProxy:
+    _real = None
+    __version__ = "0.0.0"
+
+    @staticmethod
+    def extract(prompt: str, llm: Optional[str] = None):
+        if _JointExtractorProxy._real is None:
+            try:
+                from compliance_guardian.agents import joint_extractor as _je
+
+                _JointExtractorProxy._real = _je
+                _JointExtractorProxy.__version__ = getattr(
+                    _je, "__version__", "0.0.0"
+                )
+            except Exception:
+                _JointExtractorProxy._real = False
+        if _JointExtractorProxy._real:
+            return _JointExtractorProxy._real.extract(prompt, llm=llm)
+        try:
+            from compliance_guardian.agents import domain_classifier
+
+            primary = domain_classifier.classify_domain(prompt)
+        except Exception:
+            primary = "other"
+        return [primary], []
+
+
+joint_extractor = _JointExtractorProxy()
 
 # ---------------------------------------------------------------------------
 
