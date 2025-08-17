@@ -71,7 +71,7 @@ def _call_llm(messages: Sequence[Dict[str, str]], llm: Optional[str]) -> str:
     if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
         client = openai.OpenAI()
         resp = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=messages,  # type: ignore[arg-type]
             temperature=0.1,
             top_p=0.9,

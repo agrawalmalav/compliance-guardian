@@ -17,8 +17,6 @@ from typing import Dict, Generator, List, Optional, Tuple
 
 from compliance_guardian.agents import (
     compliance_agent,
-    domain_classifier,
-    joint_extractor,
     primary_agent,
     rule_selector,
 )
@@ -42,13 +40,35 @@ class RunConfig:
 
 
 def _set_api_key(cfg: RunConfig) -> str:
-    """Expose the selected provider API key via environment variables."""
+    """Expose the selected provider API key via environment variables.
 
-    if cfg.provider == "openai" and cfg.api_key:
-        os.environ["OPENAI_API_KEY"] = cfg.api_key
-    if cfg.provider == "gemini" and cfg.api_key:
-        os.environ["GEMINI_API_KEY"] = cfg.api_key
-    return cfg.provider
+    If an explicit key is provided it is preferred; otherwise any existing
+    environment variable (for example loaded from a ``.env`` file) is used.
+    A ``RuntimeError`` is raised when the selected provider lacks credentials.
+    """
+
+    try:  # pragma: no cover - optional dependency
+        from dotenv import load_dotenv
+
+        load_dotenv()  # Ensure .env is loaded if present
+    except Exception:  # pragma: no cover - missing dotenv
+        pass
+
+    if cfg.provider == "openai":
+        key = cfg.api_key or os.getenv("OPENAI_API_KEY")
+        if not key:
+            raise RuntimeError("No OpenAI API key configured")
+        os.environ["OPENAI_API_KEY"] = key
+        return "openai"
+
+    if cfg.provider == "gemini":
+        key = cfg.api_key or os.getenv("GEMINI_API_KEY")
+        if not key:
+            raise RuntimeError("No Gemini API key configured")
+        os.environ["GEMINI_API_KEY"] = key
+        return "gemini"
+
+    raise RuntimeError(f"Unknown provider '{cfg.provider}'")
 
 
 def _format_entries(
@@ -122,24 +142,35 @@ def run_pipeline_events(prompt: str, cfg: RunConfig) -> Generator[Dict, None, Di
 
     # Domain detection -----------------------------------------------------
     try:
-        domains, extracted_rules = joint_extractor.extract(prompt, llm)
+        from compliance_guardian.agents import joint_extractor as _je
+        HAS_JE = True
     except Exception:
-        domains = [domain_classifier.classify_domain(prompt)]
-        extracted_rules = []
-    user_rules = extracted_rules + list(cfg.user_rules)
-    primary = domains[0] if domains else "other"
-    secondary = domains[1] if len(domains) > 1 else None
-    yield {
-        "type": "domains",
-        "data": {"primary": primary, "secondary": secondary, "confidence": 1.0},
-    }
-    yield {
-        "type": "user_rules",
-        "data": [r.to_dict() for r in user_rules],
-    }
+        HAS_JE = False
+
+    if HAS_JE:
+        dom_list, extracted_rules = _je.extract(prompt, llm)
+        primary = dom_list[0] if dom_list else "other"
+        secondary = dom_list[1] if len(dom_list) > 1 else None
+        domains = {"primary": primary, "secondary": secondary, "confidence": 1.0}
+        user_rules = extracted_rules
+    else:
+        from compliance_guardian.agents import domain_classifier
+        primary = domain_classifier.classify_domain(prompt, llm)
+        domains = {"primary": primary, "secondary": None, "confidence": 0.50}
+        user_rules = []
+
+    user_rules = list(user_rules) + list(cfg.user_rules)
+
+    yield {"type": "domains", "data": domains}
+    yield {"type": "user_rules", "data": [r.to_dict() for r in user_rules]}
 
     selector = rule_selector.RuleSelector()
-    rules, rulebase_version = selector.aggregate(domains, user_rules)
+    domain_key = domains["primary"] if isinstance(domains, dict) else str(domains)
+    domain_list = [domain_key]
+    if isinstance(domains, dict) and domains.get("secondary"):
+        domain_list.append(str(domains["secondary"]))
+    rules, _ = selector.aggregate(domain_list, user_rules or [])
+    rulebase_version = selector.get_version(domain_key)
     rule_lookup = {r.rule_id: r for r in rules}
     summaries = [
         RuleSummary(rule_id=r.rule_id, description=r.description, action=r.action)
@@ -170,12 +201,12 @@ def run_pipeline_events(prompt: str, cfg: RunConfig) -> Generator[Dict, None, Di
     warn_constraints = [
         r.llm_instruction or r.description for r in rules if r.action == "WARN"
     ]
-    plan = primary_agent.generate_plan(prompt, domains, warn_constraints, llm)
+    plan = primary_agent.generate_plan(prompt, domain_list, warn_constraints, llm)
     yield {"type": "plan", "data": {"goal": plan.goal, "steps": plan.sub_actions}}
 
     do_plan_check = cfg.plan_check_mode == "always" or (
         cfg.plan_check_mode == "auto"
-        and any(d in {"scraping", "finance", "medical"} for d in domains)
+        and any(d in {"scraping", "finance", "medical"} for d in domain_list)
     )
     plan_entries: List[AuditLogEntry] = []
     if do_plan_check:

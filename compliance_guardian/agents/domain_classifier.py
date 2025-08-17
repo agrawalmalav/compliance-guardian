@@ -16,7 +16,7 @@ __version__ = "0.2.1"
 
 import logging
 import os
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Optional
 import json
 
 try:
@@ -56,7 +56,7 @@ If confidence < 0.6, set primary="other" and secondary=null.
 """
 
 
-def _llm_classify(prompt: str) -> str:
+def _llm_classify(prompt: str, llm: Optional[str]) -> str:
     """Classify ``prompt`` with an LLM as a last resort."""
 
     LOGGER.info("Invoking LLM for domain classification")
@@ -65,17 +65,17 @@ def _llm_classify(prompt: str) -> str:
         {"role": "user", "content": CLASSIFY_USER_TEMPLATE.format(prompt=prompt)},
     ]
     try:
-        if openai and os.getenv("OPENAI_API_KEY"):
+        if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
             client = openai.OpenAI()
             resp = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o",
                 messages=messages,  # type: ignore[arg-type]
                 temperature=0.1,
                 top_p=0.9,
                 max_tokens=200,
             )
             raw = resp.choices[0].message.content or "{}"
-        elif genai and os.getenv("GEMINI_API_KEY"):
+        elif (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
             genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
             model = genai.GenerativeModel("gemini-2.5-flash")
             res = model.generate_content(
@@ -99,7 +99,7 @@ def _llm_classify(prompt: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def classify_domain(prompt: str) -> str:
+def classify_domain(prompt: str, llm: Optional[str] = None) -> str:
     """Return the high-level domain for a user ``prompt``.
 
     The function first checks for obvious domain keywords. If no clear
@@ -125,7 +125,7 @@ def classify_domain(prompt: str) -> str:
     else:
         LOGGER.info("Ambiguous keywords %s; querying LLM", hits)
 
-    domain = _llm_classify(prompt)
+    domain = _llm_classify(prompt, llm)
     LOGGER.info("LLM classified domain as '%s'", domain)
     return domain
 
