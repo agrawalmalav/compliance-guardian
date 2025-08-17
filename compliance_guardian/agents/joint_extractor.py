@@ -75,46 +75,92 @@ def _llm_extract(prompt: str, llm: Optional[str]) -> Tuple[List[str], List[Rule]
         {"role": "system", "content": EXTRACT_SYSTEM},
         {"role": "user", "content": EXTRACT_USER_TEMPLATE.format(prompt=prompt)},
     ]
-    try:
-        if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
-            client = openai.OpenAI()
-            resp = client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,  # type: ignore[arg-type]
-                temperature=0.1,
-                top_p=0.9,
-                max_tokens=400,
-            )
-            raw = resp.choices[0].message.content or "{}"
-            raw = _strip_code_fence(raw)
-        elif (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
-            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-            model = genai.GenerativeModel("gemini-2.5-flash")
-            res = model.generate_content(
-                "\n".join(m["content"] for m in messages),
-                generation_config={"temperature": 0.1, "top_p": 0.9},
-            )
-            raw = res.text or "{}"
-            raw = _strip_code_fence(raw)
+    errors: List[str] = []
+    if llm in {None, "openai"}:
+        if openai is None:
+            msg = "OpenAI package not installed"
+            if llm == "openai":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            errors.append(msg)
+        elif not os.getenv("OPENAI_API_KEY"):
+            msg = "OpenAI API key not configured"
+            if llm == "openai":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            errors.append(msg)
         else:
-            raise RuntimeError("No LLM credentials available")
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError as exc:  # pragma: no cover - invalid JSON
-            LOGGER.warning("LLM joint extraction failed: %s; output=%r", exc, raw)
-            data = {}
-        domains = data.get("domains") or []
-        user_rules = data.get("user_rules") or []
-        instructions = [
-            r.get("description_actionable", "")
-            for r in user_rules
-            if isinstance(r, dict)
-        ]
-    except Exception as exc:  # pragma: no cover - network/LLM errors
-        LOGGER.warning("LLM joint extraction failed: %s", exc)
-        domains, instructions = [], []
-    rules = [_build_user_rule(i + 1, inst) for i, inst in enumerate(instructions) if inst]
-    return domains, rules
+            try:
+                client = openai.OpenAI()
+                resp = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=messages,  # type: ignore[arg-type]
+                    temperature=0.1,
+                    top_p=0.9,
+                    max_tokens=400,
+                )
+                raw = resp.choices[0].message.content or "{}"
+                raw = _strip_code_fence(raw)
+            except Exception as exc:  # pragma: no cover - network/LLM errors
+                LOGGER.warning("LLM joint extraction failed: %s", exc)
+                return [], []
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError as exc:  # pragma: no cover - invalid JSON
+                LOGGER.warning("LLM joint extraction failed: %s; output=%r", exc, raw)
+                data = {}
+            domains = data.get("domains") or []
+            user_rules = data.get("user_rules") or []
+            instructions = [
+                r.get("description_actionable", "")
+                for r in user_rules
+                if isinstance(r, dict)
+            ]
+            rules = [_build_user_rule(i + 1, inst) for i, inst in enumerate(instructions) if inst]
+            return domains, rules
+    if llm in {None, "gemini"}:
+        if genai is None:
+            msg = "Google Generative AI package not installed"
+            if llm == "gemini":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            errors.append(msg)
+        elif not os.getenv("GEMINI_API_KEY"):
+            msg = "Google Generative AI API key not configured"
+            if llm == "gemini":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            errors.append(msg)
+        else:
+            try:
+                genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+                model = genai.GenerativeModel("gemini-2.5-flash")
+                res = model.generate_content(
+                    "\n".join(m["content"] for m in messages),
+                    generation_config={"temperature": 0.1, "top_p": 0.9},
+                )
+                raw = res.text or "{}"
+                raw = _strip_code_fence(raw)
+            except Exception as exc:  # pragma: no cover - network/LLM errors
+                LOGGER.warning("LLM joint extraction failed: %s", exc)
+                return [], []
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError as exc:  # pragma: no cover - invalid JSON
+                LOGGER.warning("LLM joint extraction failed: %s; output=%r", exc, raw)
+                data = {}
+            domains = data.get("domains") or []
+            user_rules = data.get("user_rules") or []
+            instructions = [
+                r.get("description_actionable", "")
+                for r in user_rules
+                if isinstance(r, dict)
+            ]
+            rules = [_build_user_rule(i + 1, inst) for i, inst in enumerate(instructions) if inst]
+            return domains, rules
+    for err in errors:
+        LOGGER.error(err)
+    raise RuntimeError("No LLM credentials available")
 
 
 def _heuristic_domains(prompt: str) -> List[str]:
@@ -156,11 +202,17 @@ def extract(prompt: str, llm: Optional[str] = None) -> Tuple[List[str], List[Rul
         Preferred LLM provider. ``None`` chooses the first configured provider.
     """
 
-    if openai or genai:
+    if llm is not None:
         domains, rules = _llm_extract(prompt, llm)
-
         if domains:
             return domains, rules
+    elif openai or genai:
+        try:
+            domains, rules = _llm_extract(prompt, None)
+            if domains:
+                return domains, rules
+        except RuntimeError as exc:
+            LOGGER.warning("LLM joint extraction unavailable: %s", exc)
     domains = _heuristic_domains(prompt)
     rules = _heuristic_instructions(prompt)
     return domains, rules
