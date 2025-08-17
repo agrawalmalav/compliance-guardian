@@ -11,8 +11,23 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from watchdog.events import FileSystemEventHandler
-from watchdog.observers import Observer as WatchdogObserver
+try:  # Watchdog is optional; provide a no-op fallback if missing
+    from watchdog.events import FileSystemEventHandler
+    from watchdog.observers import Observer as WatchdogObserver
+    _HAS_WATCHDOG = True
+except Exception:  # pragma: no cover - environment without watchdog
+    _HAS_WATCHDOG = False
+
+    class FileSystemEventHandler:  # type: ignore[override]
+        """Minimal stub when watchdog is unavailable."""
+
+    class WatchdogObserver:  # type: ignore[override]
+        def schedule(self, *args: Any, **kwargs: Any) -> None:  # noqa: D401
+            """No-op schedule"""
+
+        def start(self) -> None:  # noqa: D401
+            """No-op start"""
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -77,17 +92,17 @@ class RuleSelector:
     # ------------------------------------------------------------
     def _start_watcher(self) -> None:
         """Start watchdog observer to auto reload rules."""
-        if self._observer:
+        if self._observer or not _HAS_WATCHDOG:
             return
         handler = _RuleFileHandler(self)
         self._observer = Observer()
-        self._observer.schedule(
-            handler,
-            str(self.rules_dir),
-            recursive=False,
-        )
-        self._observer.start()
-        LOGGER.info("Started watchdog observer on %s", self.rules_dir)
+        self._observer.schedule(handler, str(self.rules_dir), recursive=False)
+        try:
+            self._observer.start()
+            LOGGER.info("Started watchdog observer on %s", self.rules_dir)
+        except Exception:  # pragma: no cover - defensive
+            LOGGER.debug("Watchdog observer failed to start; continuing without hot reload")
+            self._observer = None
 
     # ------------------------------------------------------------
     def _strip_comments(self, data: str) -> str:
