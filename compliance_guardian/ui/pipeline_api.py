@@ -126,14 +126,15 @@ def run_pipeline_events(prompt: str, cfg: RunConfig) -> Generator[Dict, None, Di
         HAS_JE = False
 
     if HAS_JE:
-        dom_list, extracted_rules = _je.extract(prompt)
+        dom_list, extracted_rules = _je.extract(prompt, llm)
         primary = dom_list[0] if dom_list else "other"
         secondary = dom_list[1] if len(dom_list) > 1 else None
         domains = {"primary": primary, "secondary": secondary, "confidence": 1.0}
         user_rules = extracted_rules
     else:
         from compliance_guardian.agents import domain_classifier
-        primary = domain_classifier.classify_domain(prompt)
+        primary = domain_classifier.classify_domain(prompt, llm)
+
         domains = {"primary": primary, "secondary": None, "confidence": 0.50}
         user_rules = []
 

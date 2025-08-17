@@ -120,7 +120,7 @@ def translate_explanation(text: str, target_lang: str = "fr") -> str:
                 )
                 client = openai.OpenAI()
                 resp = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
+                    model="gpt-4o",
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.1,
                     top_p=0.9,
@@ -129,7 +129,7 @@ def translate_explanation(text: str, target_lang: str = "fr") -> str:
                 translated = (
                     resp.choices[0].message.content or ""
                 ).strip()
-                provider = "openai/gpt-3.5-turbo"
+                provider = "openai/gpt-4o"
             else:
                 raise RuntimeError("OPENAI_API_KEY not set")
         except Exception as exc:  # pragma: no cover - optional dependency

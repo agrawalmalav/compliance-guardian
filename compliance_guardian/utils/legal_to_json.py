@@ -29,7 +29,7 @@ logging.basicConfig(level=logging.INFO)
 def _call_llm(prompt: str) -> str:
     """Call an available LLM and return the raw response."""
     if openai and os.getenv("OPENAI_API_KEY"):
-        model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+        model = os.getenv("OPENAI_MODEL", "gpt-4o")
         client = openai.OpenAI()
         resp = client.chat.completions.create(
             model=model,
