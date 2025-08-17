@@ -65,25 +65,54 @@ def _call_llm(messages: Sequence[Dict[str, str]], llm: Optional[str]) -> str:
     """Invoke the configured LLM and return its textual response."""
 
     LOGGER.debug("LLM messages: %s", messages)
-    if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
-        client = openai.OpenAI()
-        resp = client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,  # type: ignore[arg-type]
-            temperature=0.1,
-            top_p=0.9,
-            max_tokens=300,
-        )
-        content = resp.choices[0].message.content or ""
-        return content.strip()
-    if (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        res = model.generate_content(
-            "\n".join(m["content"] for m in messages),
-            generation_config={"temperature": 0.1, "top_p": 0.9},
-        )
-        return res.text.strip()
+    errors: List[str] = []
+    if llm in {None, "openai"}:
+        if openai is None:
+            msg = "OpenAI package not installed"
+            if llm == "openai":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            errors.append(msg)
+        elif not os.getenv("OPENAI_API_KEY"):
+            msg = "OpenAI API key not configured"
+            if llm == "openai":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            errors.append(msg)
+        else:
+            client = openai.OpenAI()
+            resp = client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,  # type: ignore[arg-type]
+                temperature=0.1,
+                top_p=0.9,
+                max_tokens=300,
+            )
+            content = resp.choices[0].message.content or ""
+            return content.strip()
+    if llm in {None, "gemini"}:
+        if genai is None:
+            msg = "Google Generative AI package not installed"
+            if llm == "gemini":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            errors.append(msg)
+        elif not os.getenv("GEMINI_API_KEY"):
+            msg = "Google Generative AI API key not configured"
+            if llm == "gemini":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            errors.append(msg)
+        else:
+            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            res = model.generate_content(
+                "\n".join(m["content"] for m in messages),
+                generation_config={"temperature": 0.1, "top_p": 0.9},
+            )
+            return res.text.strip()
+    for err in errors:
+        LOGGER.error(err)
     LOGGER.warning("No LLM credentials configured; validation falls back")
     raise RuntimeError("No LLM credentials configured")
 

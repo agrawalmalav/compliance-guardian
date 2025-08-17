@@ -28,26 +28,40 @@ logging.basicConfig(level=logging.INFO)
 
 def _call_llm(prompt: str) -> str:
     """Call an available LLM and return the raw response."""
-    if openai and os.getenv("OPENAI_API_KEY"):
-        model = os.getenv("OPENAI_MODEL", "gpt-4o")
-        client = openai.OpenAI()
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "system", "content": prompt}],
-            temperature=0.1,
-            top_p=0.9,
-            max_tokens=400,
-        )
-        content = resp.choices[0].message.content or ""
-        return content.strip()
-    if genai and os.getenv("GEMINI_API_KEY"):
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        res = model.generate_content(
-            prompt,
-            generation_config={"temperature": 0.1, "top_p": 0.9},
-        )
-        return res.text.strip()
+
+    errors: list[str] = []
+    if openai:
+        if not os.getenv("OPENAI_API_KEY"):
+            errors.append("OpenAI API key not configured")
+        else:
+            model = os.getenv("OPENAI_MODEL", "gpt-4o")
+            client = openai.OpenAI()
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "system", "content": prompt}],
+                temperature=0.1,
+                top_p=0.9,
+                max_tokens=400,
+            )
+            content = resp.choices[0].message.content or ""
+            return content.strip()
+    else:
+        errors.append("OpenAI package not installed")
+    if genai:
+        if not os.getenv("GEMINI_API_KEY"):
+            errors.append("Google Generative AI API key not configured")
+        else:
+            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            res = model.generate_content(
+                prompt,
+                generation_config={"temperature": 0.1, "top_p": 0.9},
+            )
+            return res.text.strip()
+    else:
+        errors.append("Google Generative AI package not installed")
+    for err in errors:
+        LOGGER.error(err)
     raise RuntimeError("No LLM credentials configured")
 
 

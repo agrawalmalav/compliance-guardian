@@ -16,7 +16,7 @@ __version__ = "0.2.1"
 
 import logging
 import os
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, List
 import json
 
 try:
@@ -64,36 +64,72 @@ def _llm_classify(prompt: str, llm: Optional[str]) -> str:
         {"role": "system", "content": CLASSIFY_SYSTEM},
         {"role": "user", "content": CLASSIFY_USER_TEMPLATE.format(prompt=prompt)},
     ]
-    try:
-        if (llm in {None, "openai"}) and openai and os.getenv("OPENAI_API_KEY"):
-            client = openai.OpenAI()
-            resp = client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,  # type: ignore[arg-type]
-                temperature=0.1,
-                top_p=0.9,
-                max_tokens=200,
-            )
-            raw = resp.choices[0].message.content or "{}"
-        elif (llm in {None, "gemini"}) and genai and os.getenv("GEMINI_API_KEY"):
-            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-            model = genai.GenerativeModel("gemini-2.5-flash")
-            res = model.generate_content(
-                "\n".join(m["content"] for m in messages),
-                generation_config={"temperature": 0.1, "top_p": 0.9},
-            )
-            raw = res.text or "{}"
-        else:  # pragma: no cover - only hits when no API keys configured
-            LOGGER.warning("No LLM credentials available; defaulting to 'other'")
-            return "other"
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            return "other"
-        return data.get("primary", "other") or "other"
-    except Exception as exc:  # pragma: no cover - LLM failure
-        LOGGER.error("LLM classification failed: %s", exc)
-        return "other"
+    errors: List[str] = []
+    if llm in {None, "openai"}:
+        if openai is None:
+            msg = "OpenAI package not installed"
+            if llm == "openai":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            errors.append(msg)
+        elif not os.getenv("OPENAI_API_KEY"):
+            msg = "OpenAI API key not configured"
+            if llm == "openai":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            errors.append(msg)
+        else:
+            try:
+                client = openai.OpenAI()
+                resp = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=messages,  # type: ignore[arg-type]
+                    temperature=0.1,
+                    top_p=0.9,
+                    max_tokens=200,
+                )
+                raw = resp.choices[0].message.content or "{}"
+            except Exception as exc:  # pragma: no cover - LLM failure
+                LOGGER.error("LLM classification failed: %s", exc)
+                return "other"
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                return "other"
+            return data.get("primary", "other") or "other"
+    if llm in {None, "gemini"}:
+        if genai is None:
+            msg = "Google Generative AI package not installed"
+            if llm == "gemini":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            errors.append(msg)
+        elif not os.getenv("GEMINI_API_KEY"):
+            msg = "Google Generative AI API key not configured"
+            if llm == "gemini":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            errors.append(msg)
+        else:
+            try:
+                genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+                model = genai.GenerativeModel("gemini-2.5-flash")
+                res = model.generate_content(
+                    "\n".join(m["content"] for m in messages),
+                    generation_config={"temperature": 0.1, "top_p": 0.9},
+                )
+                raw = res.text or "{}"
+            except Exception as exc:  # pragma: no cover - LLM failure
+                LOGGER.error("LLM classification failed: %s", exc)
+                return "other"
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                return "other"
+            return data.get("primary", "other") or "other"
+    for err in errors:
+        LOGGER.error(err)
+    raise RuntimeError("No LLM credentials available")
 
 
 # ---------------------------------------------------------------------------
@@ -125,9 +161,17 @@ def classify_domain(prompt: str, llm: Optional[str] = None) -> str:
     else:
         LOGGER.info("Ambiguous keywords %s; querying LLM", hits)
 
-    domain = _llm_classify(prompt, llm)
-    LOGGER.info("LLM classified domain as '%s'", domain)
-    return domain
+    if llm is not None:
+        domain = _llm_classify(prompt, llm)
+        LOGGER.info("LLM classified domain as '%s'", domain)
+        return domain
+    try:
+        domain = _llm_classify(prompt, None)
+        LOGGER.info("LLM classified domain as '%s'", domain)
+        return domain
+    except RuntimeError as exc:
+        LOGGER.warning("LLM classification unavailable: %s; defaulting to 'other'", exc)
+        return "other"
 
 
 # ---------------------------------------------------------------------------
