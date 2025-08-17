@@ -79,7 +79,9 @@ with run_tab:
     custom = st.text_input("Add custom instructions (optional)")
     if st.button("Add rule"):
         _add_user_rule(custom, st.session_state.user_rules)
-        st.experimental_rerun()
+        rerun = getattr(st, "rerun", getattr(st, "experimental_rerun", None))
+        if rerun:
+            rerun()
     if st.session_state.user_rules:
         st.markdown("### Custom Rules")
         for r in st.session_state.user_rules:
