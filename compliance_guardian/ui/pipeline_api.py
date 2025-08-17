@@ -40,13 +40,35 @@ class RunConfig:
 
 
 def _set_api_key(cfg: RunConfig) -> str:
-    """Expose the selected provider API key via environment variables."""
+    """Expose the selected provider API key via environment variables.
 
-    if cfg.provider == "openai" and cfg.api_key:
-        os.environ["OPENAI_API_KEY"] = cfg.api_key
-    if cfg.provider == "gemini" and cfg.api_key:
-        os.environ["GEMINI_API_KEY"] = cfg.api_key
-    return cfg.provider
+    If an explicit key is provided it is preferred; otherwise any existing
+    environment variable (for example loaded from a ``.env`` file) is used.
+    A ``RuntimeError`` is raised when the selected provider lacks credentials.
+    """
+
+    try:  # pragma: no cover - optional dependency
+        from dotenv import load_dotenv
+
+        load_dotenv()  # Ensure .env is loaded if present
+    except Exception:  # pragma: no cover - missing dotenv
+        pass
+
+    if cfg.provider == "openai":
+        key = cfg.api_key or os.getenv("OPENAI_API_KEY")
+        if not key:
+            raise RuntimeError("No OpenAI API key configured")
+        os.environ["OPENAI_API_KEY"] = key
+        return "openai"
+
+    if cfg.provider == "gemini":
+        key = cfg.api_key or os.getenv("GEMINI_API_KEY")
+        if not key:
+            raise RuntimeError("No Gemini API key configured")
+        os.environ["GEMINI_API_KEY"] = key
+        return "gemini"
+
+    raise RuntimeError(f"Unknown provider '{cfg.provider}'")
 
 
 def _format_entries(
@@ -134,7 +156,6 @@ def run_pipeline_events(prompt: str, cfg: RunConfig) -> Generator[Dict, None, Di
     else:
         from compliance_guardian.agents import domain_classifier
         primary = domain_classifier.classify_domain(prompt, llm)
-
         domains = {"primary": primary, "secondary": None, "confidence": 0.50}
         user_rules = []
 
