@@ -134,6 +134,7 @@ def run_pipeline_events(prompt: str, cfg: RunConfig) -> Generator[Dict, None, Di
     else:
         from compliance_guardian.agents import domain_classifier
         primary = domain_classifier.classify_domain(prompt, llm)
+
         domains = {"primary": primary, "secondary": None, "confidence": 0.50}
         user_rules = []
 
