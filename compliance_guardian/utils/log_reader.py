@@ -9,21 +9,15 @@ from typing import Dict, List
 from . import log_writer
 
 
-def read_last_entries(limit: int = 100) -> List[Dict]:
-    """Return the last ``limit`` entries from the audit log.
-
-    Parameters
-    ----------
-    limit:
-        Maximum number of entries to return.
-    """
+def read_last_n(n: int = 200) -> List[Dict]:
+    """Return the last ``n`` entries from the audit log."""
 
     path = Path(log_writer._LOG_FILE)  # type: ignore[attr-defined]
     if not path.exists():
         return []
     try:
         with path.open("r", encoding="utf-8") as fh:
-            lines = fh.readlines()[-limit:]
+            lines = fh.readlines()[-n:]
     except Exception:
         return []
     entries: List[Dict] = []

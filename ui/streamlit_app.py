@@ -2,16 +2,24 @@ from __future__ import annotations
 
 """Streamlit demo interface for the Compliance Guardian pipeline."""
 
-from datetime import datetime
 from pathlib import Path
+import sys
+
+try:  # Ensure local imports work regardless of CWD
+    import compliance_guardian  # noqa: F401
+except Exception:  # pragma: no cover - defensive
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+    import compliance_guardian  # noqa: F401
+
+from datetime import datetime
 from typing import List
 
 import pandas as pd
 import streamlit as st
 
-from compliance_guardian.agents import joint_extractor, rule_selector
+from compliance_guardian.agents import rule_selector
 from compliance_guardian.ui.pipeline_api import RunConfig, run_pipeline_events
-from compliance_guardian.utils.log_reader import read_last_entries
+from compliance_guardian.utils.log_reader import read_last_n
 
 
 st.set_page_config(page_title="Compliance Guardian", layout="wide")
@@ -53,7 +61,12 @@ def _render_hits(box, data: dict, show_extra: bool) -> None:
 def _add_user_rule(text: str, rules: List) -> None:
     if not text:
         return
-    rule = joint_extractor._build_user_rule(len(rules) + 1, text)  # type: ignore[attr-defined]
+    try:
+        from compliance_guardian.agents import joint_extractor as _je
+    except Exception:
+        st.warning("Custom rule support unavailable.")
+        return
+    rule = _je._build_user_rule(len(rules) + 1, text)  # type: ignore[attr-defined]
     rules.append(rule)
 
 
@@ -66,7 +79,9 @@ with run_tab:
     custom = st.text_input("Add custom instructions (optional)")
     if st.button("Add rule"):
         _add_user_rule(custom, st.session_state.user_rules)
-        st.experimental_rerun()
+        rerun = getattr(st, "rerun", getattr(st, "experimental_rerun", None))
+        if rerun:
+            rerun()
     if st.session_state.user_rules:
         st.markdown("### Custom Rules")
         for r in st.session_state.user_rules:
@@ -137,7 +152,7 @@ with run_tab:
 
 # Logs tab -----------------------------------------------------------------
 with logs_tab:
-    entries = read_last_entries(200)
+    entries = read_last_n(200)
     if entries:
         df = pd.DataFrame(entries)
         st.dataframe(df, use_container_width=True)
