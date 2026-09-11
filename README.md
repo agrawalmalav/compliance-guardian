@@ -1,150 +1,176 @@
-# Compliance Guardian Agent
+# Compliance Guardian
 
-[![Coverage](https://img.shields.io/badge/coverage-80%25-green.svg)](docs/index.html)
+A research-driven guardrail layer for LLM and agent workflows. Compliance Guardian evaluates a request before execution, applies domain-specific rules, validates the generated output, and records an auditable explanation of the decision.
 
-A modular research project demonstrating how an automated agent can guard
-large language model (LLM) pipelines using domain specific compliance rules.
-The system was developed as part of an MSc thesis on trustworthy AI.
+The project was developed as part of an MSc research project on trustworthy AI and focuses on a practical question: **how can an AI system enforce explicit governance rules without hiding the decision process inside the model?**
 
+## What it does
+
+```mermaid
+flowchart LR
+    A[User prompt] --> B[Domain classifier]
+    B --> C[Rule selector]
+    C --> D[Primary agent: plan]
+    D --> E[Pre-execution compliance check]
+    E -->|Allow / Warn| F[Primary agent: execute]
+    E -->|Block| I[Audit + explanation]
+    F --> G[Post-execution compliance check]
+    G --> H[Validated output]
+    G --> I
+    H --> I
 ```
-User Prompt -> Domain Classifier -> Rule Selector -> Primary Agent
-   -> Compliance Agent (plan check) -> Primary Agent (execute)
-   -> Compliance Agent (output check) -> Log Writer
-```
 
-The diagram above shows the high level data flow. A user prompt is first
-classified into a domain. Rules for that domain are loaded and used to vet the
-execution plan and final output. All decisions are logged for audit.
+The system separates task execution from compliance enforcement. Rules are explicit, inspectable and domain-specific, while the LLM is used as part of the reasoning pipeline rather than as the sole source of policy.
 
-## Features
+## Current capabilities
 
-- Keyword and LLM backed domain classification
-- Hot‑reloading rule selector using `watchdog`
-- Plan generation and execution with OpenAI or Gemini models
-- Pre and post execution compliance checks
-- Risk scoring and detailed audit logs
-- CLI for running batches and an evaluation harness
+- **Domain classification** using keyword-based and LLM-backed routing.
+- **Dynamic rule selection** with domain rule packs and hot reloading through `watchdog`.
+- **Plan-stage guardrails** that inspect an intended action before execution.
+- **Output-stage guardrails** that validate the generated result before it is returned.
+- **Structured decisions and risk scoring** using Pydantic models.
+- **Audit logging** with rule hits, explanations and governance reports.
+- **OpenAI and Gemini support** for model-backed stages of the pipeline.
+- **Multilingual explanations** for audit and governance outputs.
+- **CLI, evaluation harness and demo tooling** for repeatable experiments.
+- **Security and privacy documentation** covering the threat model and handling assumptions.
 
-## Tech Stack
+## Domain rule packs
+
+The repository currently includes configurable rules for:
+
+- Finance
+- Medical workflows
+- Web scraping
+- Generic AI usage
+
+Rules are stored as JSON under `compliance_guardian/config/rules/`. Each rule can include a description, prescribed action, legal or policy reference and user-facing guidance. Lightweight summaries are generated separately so the model receives only the context it needs.
+
+## Tech stack
 
 - Python 3.12
-- Typer CLI
-- LangChain / LangGraph for LLM access
-- Pydantic models
-- Sphinx documentation and flake8/mypy for quality checks
+- Pydantic
+- LangChain
+- OpenAI / Gemini
+- Typer
+- Streamlit
+- Watchdog
+- Pytest
+- mypy / flake8
+- Sphinx
 
-## Quickstart
+## Repository structure
+
+```text
+compliance_guardian/
+  agents/                 Domain classification, planning and compliance agents
+  config/rules/           Full domain-specific rule definitions
+  config/rules_summary/   Reduced rule context for LLM calls
+  datasets/               Evaluation scenarios
+  logs/                   Runtime audit logs
+  reports/                Governance reports
+  ui/                     UI-facing pipeline helpers
+
+docs/                     Sphinx documentation
+notebooks/                Interactive demo material
+tests/                    Unit and pipeline-focused tests
+main.py                   CLI entry point
+eval.py                   Evaluation harness
+run_all.py                End-to-end execution helper
+export_appendix.py         Research/report export utility
+```
+
+## Quick start
+
+### 1. Install
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python main.py run --prompt "Scrape article titles from example.com" --session-id demo
 ```
 
-Audit logs appear under `logs/` and a governance report under `reports/`.
+### 2. Configure a model provider
 
-## Multilingual Support
+Copy `.env.example` and provide the credentials required by the provider you want to use.
 
-Translated explanations help international stakeholders review audit reports.
-Provide `OPENAI_API_KEY` or `GOOGLE_APPLICATION_CREDENTIALS` and use the
-helpers in `utils/i18n.py`:
+### 3. Run a prompt
 
-```python
-from compliance_guardian.utils.i18n import (
-    translate_explanation,
-    log_multilingual_explanation,
-)
-
-fr_text = translate_explanation(entry.justification, "fr")
-log_multilingual_explanation(entry, fr_text, target_lang="fr", translation_source="openai")
+```bash
+python main.py run \
+  --prompt "Scrape article titles from example.com" \
+  --session-id demo
 ```
 
-The translated text and the provider used are appended to `logs/audit_log.jsonl`.
+Audit records and governance outputs are written to the repository's log/report directories.
 
-## Running Tests and Demo
+## Evaluation and testing
 
-Run static checks and the demo scenarios. The evaluation dataset is stored at
-`compliance_guardian/datasets/test_scenarios.json`:
+The project includes an evaluation harness and a test suite covering core components such as:
+
+- domain classification
+- rule selection
+- compliance decisions
+- output validation
+- risk scoring
+- audit logging
+- retry limits
+- model/provider configuration
+- structured models and JSON rule files
+
+Run the checks with:
 
 ```bash
 flake8
 mypy compliance_guardian
 pytest -q
 python eval.py
-# Check JSON files
-python scripts/json_validate.py compliance_guardian/datasets/test_scenarios.json
 ```
 
-See `notebooks/Demo.ipynb` for an interactive walkthrough.
-When running the notebook, execute all cells sequentially ("Run All" or
-"Restart & Run All") to ensure that variables defined in earlier cells are
-available for later steps. Skipping a cell can lead to `NameError` exceptions.
+The evaluation scenarios are stored under `compliance_guardian/datasets/` and are designed to make guardrail behaviour inspectable rather than relying only on subjective model outputs.
 
-Documentation is built with Sphinx:
+## Adding a new compliance domain
+
+Add a JSON file under:
+
+```text
+compliance_guardian/config/rules/<domain>.json
+```
+
+The `RuleSelector` loads domain rules dynamically. Summary files used for compact LLM context can be regenerated with:
+
+```bash
+python scripts/generate_rules_summary.py
+```
+
+## Documentation
+
+Sphinx documentation can be built locally with:
 
 ```bash
 cd docs
 sphinx-build -b html . _build
 ```
 
-The generated HTML will be available in `docs/_build`.
+Additional repository documentation includes `SECURITY.md` and `PRIVACY.md`.
 
-## Exporting Appendix Materials
+## Roadmap
 
-Use the `export_appendix.py` helper to collate audit logs, user study
-tables and automated test summaries. Specify the desired output format
-(Markdown, LaTeX or PDF):
+The current repository is a research prototype. The next engineering steps are intentionally separated from the capabilities above:
 
-```bash
-python export_appendix.py --format latex
-```
+- model the orchestration explicitly as a **LangGraph state machine** with conditional BLOCK / WARN / ALLOW paths
+- add CI-backed linting, type checking, tests and real coverage reporting
+- expand adversarial evaluation for prompt injection, jailbreaks and conflicting rules
+- improve provider abstraction so model backends can be swapped without changing governance logic
+- add richer evaluation summaries for false positives, false negatives, latency and model-to-model variance
+- package the guardrail layer behind a clean API for easier integration with external agent systems
 
-The resulting file is written to `exports/appendix_export.tex`.
+## Research context
 
-## Adding Rules or Domains
+This repository explores **governance as an explicit software layer around an AI system**. The aim is not to make an LLM responsible for interpreting every policy from scratch, but to combine structured rules, model reasoning, pre/post execution checks and auditable outputs in one pipeline.
 
-Rule files live in `compliance_guardian/config/rules/DOMAIN.json`. Each rule
-follows the schema defined in `utils/models.py`. Add a new JSON file for a new
-domain and the `RuleSelector` will pick it up automatically. The lightweight
-summary files in `config/rules_summary` are generated automatically from the
-full definitions using:
+External datasets referenced by the research include PrivacyQA, Anthropic HH-RLHF and OPP-115. Legal and policy references in the example rule packs are included for traceability and experimentation.
 
-```bash
-python scripts/generate_rules_summary.py
-```
+## Disclaimer
 
-Summary files contain only `rule_id`, a concise `description`, and the
-prescribed `action` so the LLM context stays slim. The full rule files retain
-legal references and concrete suggestions for user feedback.
-
-## External Datasets and Legal References
-
-- **PrivacyQA** – <https://github.com/cisnlp/privacyQA> (CC BY 4.0)
-  Used for privacy policy question answering experiments.
-- **HH-RLHF** – <https://huggingface.co/datasets/Anthropic/hh-rlhf> (Apache 2.0)
-  Helpful/Harmless conversations for tuning safety prompts.
-- **OPP-115** – <https://usableprivacy.org/data> (CC BY-SA 3.0)
-  Collection of annotated privacy policies.
-
-The rule files include citations to GDPR, HIPAA, PCI DSS and other regulations
-within the `legal_reference` field for traceability.
-
-Full API documentation is available in the [docs](docs/index.rst) directory.
-
-## Streamlit Demo UI
-
-Install optional dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Launch the local interface:
-
-```bash
-streamlit run ui/streamlit_app.py
-```
-
-Audit logs and governance reports are written under `compliance_guardian/logs`
-and `compliance_guardian/reports` respectively. Processing occurs locally –
-only API calls to the selected LLM provider leave your machine. The interface
-surfaced rule hits, legal references and suggestions for full transparency.
+This project is a research prototype. The included rule packs are examples for experimentation and are not legal, medical, financial or regulatory advice.
